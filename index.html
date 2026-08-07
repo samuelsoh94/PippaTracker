@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pippa's Log">
+<title>Pippa's Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#F7F1E4;
+    --card:#FFFDF8;
+    --ink:#2B2620;
+    --ink-soft:#6B6355;
+    --line:#E8DFC9;
+    --pee:#5B9BD5;
+    --pee-bg:#DCEAF6;
+    --poop:#D9B23C;
+    --poop-bg:#FBF3D6;
+    --sleep:#9B9689;
+    --sleep-bg:#EDEAE2;
+    --eat:#6E8C4E;
+    --eat-bg:#E7EED9;
+    --weight:#6B5B95;
+    --weight-bg:#E7E3F0;
+    --forest:#3A5541;
+    --rust:#BC5B2C;
+    --shadow: 0 1px 2px rgba(43,38,32,0.06), 0 4px 14px rgba(43,38,32,0.06);
+    --radius: 18px;
+    color-scheme: light;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+  body{
+    display:flex; flex-direction:column;
+    min-height:100vh;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .app{ max-width:520px; width:100%; margin:0 auto; display:flex; flex-direction:column; flex:1; min-height:100%; }
+
+  /* ---------- Header ---------- */
+  header{
+    padding: 18px 20px 14px;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand svg{ width:30px; height:30px; flex-shrink:0; }
+  .brand-text h1{
+    font-family:'Fredoka', sans-serif; font-weight:600;
+    font-size:22px; margin:0; line-height:1.1; color:var(--forest);
+  }
+  .brand-text p{ margin:1px 0 0; font-size:12px; color:var(--ink-soft); letter-spacing:.02em; }
+  .settings-btn{
+    background:none; border:none; padding:8px; cursor:pointer; color:var(--ink-soft);
+    border-radius:10px;
+  }
+  .settings-btn:active{ background:var(--line); }
+  .settings-btn svg{ width:20px; height:20px; display:block; }
+
+  /* ---------- Stat strip ---------- */
+  .stats{
+    display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px;
+  }
+  .stat{
+    background:var(--card); border:1px solid var(--line);
+    border-radius:14px; padding:10px 12px; box-shadow:var(--shadow);
+  }
+  .stat .label{ font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.05em; display:flex; align-items:center; gap:5px;}
+  .stat .value{ font-family:'JetBrains Mono', monospace; font-size:16px; font-weight:500; margin-top:3px; }
+  .dot{ width:7px; height:7px; border-radius:50%; display:inline-block; }
+
+  main{ flex:1; padding: 0 16px 90px; overflow-y:auto; }
+
+  /* ---------- Log tab: big buttons ---------- */
+  .log-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:22px; }
+  .log-btn{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px 6px 12px; display:flex; flex-direction:column; align-items:center; gap:8px;
+    box-shadow:var(--shadow); cursor:pointer; font-family:'Fredoka', sans-serif;
+    font-weight:600; font-size:14px; color:var(--ink); transition:transform .1s ease;
+    -webkit-user-select:none; user-select:none;
+  }
+  .log-btn:active{ transform:scale(0.95); }
+  .log-btn .circle{
+    width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  }
+  .log-btn .circle svg{ width:24px; height:24px; }
+  .log-btn.pee .circle{ background:var(--pee-bg); color:var(--pee); }
+  .log-btn.poop .circle{ background:var(--poop-bg); color:var(--poop); }
+  .log-btn.sleep .circle{ background:var(--sleep-bg); color:var(--sleep); }
+  .log-btn.eat .circle{ background:var(--eat-bg); color:var(--eat); }
+  .log-btn.sleep.active .circle{ background:var(--sleep); color:#fff; animation:pulse 1.8s infinite; }
+  .log-btn.sleep.active{ border-color:var(--sleep); }
+  @keyframes pulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(79,112,140,0.35);} 50%{ box-shadow:0 0 0 8px rgba(79,112,140,0);} }
+  .sleep-timer{ font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--sleep); }
+
+  .just-logged{
+    text-align:center; font-size:12px; color:var(--forest); font-weight:500;
+    height:16px; margin:-12px 0 16px; opacity:0; transition:opacity .3s;
+  }
+  .just-logged.show{ opacity:1; }
+
+  section-title, .section-title{
+    font-family:'Fredoka', sans-serif; font-weight:600; font-size:15px; color:var(--ink);
+    margin: 4px 0 10px; display:flex; align-items:center; gap:6px;
+  }
+
+  /* ---------- Timeline ---------- */
+  .timeline{ display:flex; flex-direction:column; gap:8px; }
+  .entry{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:11px 13px; display:flex; align-items:center; gap:11px; box-shadow:var(--shadow);
+    cursor:pointer;
+  }
+  .entry:active{ background:#FBF6EB; }
+  .entry .icon-circle{
+    width:34px; height:34px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .entry .icon-circle svg{ width:17px; height:17px; }
+  .entry.pee .icon-circle{ background:var(--pee-bg); color:var(--pee); }
+  .entry.poop .icon-circle{ background:var(--poop-bg); color:var(--poop); }
+  .entry.sleep .icon-circle{ background:var(--sleep-bg); color:var(--sleep); }
+  .entry.eat .icon-circle{ background:var(--eat-bg); color:var(--eat); }
+  .entry .info{ flex:1; min-width:0; }
+  .entry .info .type{ font-weight:600; font-size:14px; }
+  .entry .info .meta{ font-size:12px; color:var(--ink-soft); margin-top:1px; }
+  .entry .time{ font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--ink-soft); white-space:nowrap; }
+
+  .empty{
+    text-align:center; padding:30px 10px; color:var(--ink-soft); font-size:13px;
+  }
+  .empty svg{ width:34px; height:34px; margin-bottom:8px; opacity:.5; }
+
+  /* ---------- History tab ---------- */
+  .day-group{ margin-bottom:14px; }
+  .day-header{
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--ink-soft);
+    display:flex; align-items:center; gap:8px; margin-bottom:8px; padding-left:2px;
+    text-transform:uppercase; letter-spacing:.04em;
+  }
+  .day-header .count-pill{
+    background:var(--line); border-radius:20px; padding:1px 8px; font-size:11px; color:var(--ink);
+  }
+
+  .hist-nav{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px;
+  }
+  .hist-nav-btn{
+    background:var(--card); border:1px solid var(--line); border-radius:12px; width:38px; height:38px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--forest);
+    box-shadow:var(--shadow); flex-shrink:0;
+  }
+  .hist-nav-btn svg{ width:18px; height:18px; }
+  .hist-nav-btn.disabled{ opacity:.3; pointer-events:none; }
+  .hist-nav-label{ font-family:'Fredoka',sans-serif; font-weight:600; font-size:15px; text-align:center; flex:1; }
+  .hist-nav-label .sub{ display:block; font-family:'JetBrains Mono',monospace; font-weight:400; font-size:11px; color:var(--ink-soft); margin-top:1px; }
+
+  .heatmap-card{
+    background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px 12px;
+    box-shadow:var(--shadow); margin-bottom:20px; overflow-x:auto;
+  }
+  .heatmap{ display:grid; grid-template-columns: 42px repeat(24, 1fr); gap:2px; align-items:center; min-width:400px; }
+  .hm-row-label{ font-size:11px; color:var(--ink-soft); font-weight:600; text-align:right; padding-right:5px; white-space:nowrap; }
+  .hm-hour-label{ font-size:8px; color:var(--ink-soft); text-align:center; font-family:'JetBrains Mono',monospace; }
+  .hm-cell{ aspect-ratio:1/1; border-radius:3px; background:var(--cream); border:1px solid var(--line); }
+  .heatmap-legend{ display:flex; align-items:center; gap:6px; margin-top:10px; font-size:10px; color:var(--ink-soft); }
+
+  .add-note-btn{
+    width:100%; display:flex; align-items:center; justify-content:center; gap:6px;
+    padding:12px; border:1.5px dashed var(--line); border-radius:14px; background:transparent;
+    color:var(--ink-soft); font-family:'Inter',sans-serif; font-weight:600; font-size:13px; cursor:pointer; margin-bottom:20px;
+  }
+  .add-note-btn svg{ width:16px; height:16px; flex-shrink:0; }
+  .add-note-btn:active{ background:var(--card); }
+
+  .notes-card{
+    background:var(--card); border:1px solid var(--line); border-radius:16px; padding:12px 14px;
+    box-shadow:var(--shadow); margin-bottom:20px;
+  }
+  .notes-label{ display:flex; align-items:center; gap:6px; font-family:'Fredoka',sans-serif; font-weight:600; font-size:13px; color:var(--ink-soft); margin-bottom:6px; }
+  .notes-label svg{ width:14px; height:14px; flex-shrink:0; }
+  .notes-textarea{
+    width:100%; border:none; background:transparent; resize:none; outline:none;
+    font-family:'Inter',sans-serif; font-size:14px; color:var(--ink); line-height:1.5;
+    min-height:22px; overflow:hidden; padding:0; display:block;
+  }
+  .notes-textarea::placeholder{ color:var(--ink-soft); }
+
+  /* ---------- Weight tab ---------- */
+  .weight-header-row{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px; }
+  .unit-toggle{ display:flex; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:3px; box-shadow:var(--shadow); }
+  .unit-btn{ border:none; background:none; padding:6px 12px; border-radius:9px; font-family:'Inter',sans-serif; font-weight:600; font-size:12px; color:var(--ink-soft); cursor:pointer; }
+  .unit-btn.active{ background:var(--weight); color:#fff; }
+  .add-weight-btn{
+    display:flex; align-items:center; gap:6px; background:var(--forest); color:#fff; border:none;
+    border-radius:12px; padding:10px 14px; font-family:'Inter',sans-serif; font-weight:600; font-size:13px; cursor:pointer;
+    box-shadow:var(--shadow); white-space:nowrap;
+  }
+  .add-weight-btn svg{ width:15px; height:15px; }
+  .add-weight-btn:active{ opacity:.85; }
+
+  .weight-chart-empty{ text-align:center; padding:20px 10px; color:var(--ink-soft); font-size:13px; }
+  .weight-svg{ width:100%; height:auto; display:block; }
+  .weight-pt{ fill:var(--weight); }
+  .weight-line{ fill:none; stroke:var(--weight); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
+  .weight-axis-label{ font-family:'JetBrains Mono',monospace; font-size:8px; fill:var(--ink-soft); }
+  .weight-grid-line{ stroke:var(--line); stroke-width:1; }
+
+  .entry.weight .icon-circle{ background:var(--weight-bg); color:var(--weight); }
+  .heatmap-legend .swatch{ width:10px; height:10px; border-radius:2px; }
+
+  /* ---------- Trends tab ---------- */
+  .trend-card{
+    background:var(--card); border:1px solid var(--line); border-radius:16px;
+    padding:16px; margin-bottom:14px; box-shadow:var(--shadow);
+  }
+  .trend-card h3{ margin:0 0 12px; font-family:'Fredoka',sans-serif; font-size:14px; font-weight:600; }
+  .bars{ display:flex; align-items:flex-end; gap:8px; height:110px; }
+  .bar-col{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:4px; }
+  .bar-stack{ width:100%; display:flex; flex-direction:column-reverse; align-items:stretch; justify-content:flex-start; height:100%; gap:2px; border-radius:6px; overflow:hidden; }
+  .bar-seg{ width:100%; border-radius:2px; min-height:2px; }
+  .bar-col .day-lbl{ font-size:10px; color:var(--ink-soft); margin-top:4px; font-family:'JetBrains Mono',monospace; }
+  .legend{ display:flex; gap:14px; margin-top:12px; flex-wrap:wrap; }
+  .legend-item{ display:flex; align-items:center; gap:5px; font-size:11px; color:var(--ink-soft); }
+  .legend-dot{ width:8px; height:8px; border-radius:2px; }
+  .kv-row{ display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  .kv-row:last-child{ border-bottom:none; }
+  .kv-row .k{ color:var(--ink-soft); }
+  .kv-row .v{ font-family:'JetBrains Mono', monospace; font-weight:500; }
+
+  .trend-toggle-row{ display:flex; gap:8px; margin-bottom:14px; }
+  .trend-toggle{
+    flex:1; padding:9px 4px; border-radius:12px; border:1px solid var(--line); background:var(--card);
+    font-family:'Inter',sans-serif; font-weight:600; font-size:13px; cursor:pointer;
+  }
+  .trend-toggle[data-type="eat"]{ color:var(--eat); }
+  .trend-toggle[data-type="pee"]{ color:var(--pee); }
+  .trend-toggle[data-type="poop"]{ color:var(--poop); }
+  .trend-toggle[data-type="sleep"]{ color:var(--sleep); }
+  .trend-toggle.active[data-type="eat"]{ background:var(--eat); border-color:var(--eat); color:#fff; }
+  .trend-toggle.active[data-type="pee"]{ background:var(--pee); border-color:var(--pee); color:#fff; }
+  .trend-toggle.active[data-type="poop"]{ background:var(--poop); border-color:var(--poop); color:#fff; }
+  .trend-toggle.active[data-type="sleep"]{ background:var(--sleep); border-color:var(--sleep); color:#fff; }
+
+  .heatmap-week-wrap{ overflow-x:auto; margin-top:4px; }
+  .heatmap-week{ display:grid; grid-template-columns: 26px repeat(7, 1fr); gap:2px; min-width:280px; align-items:center; }
+  .hmw-day-label{ font-size:9px; color:var(--ink-soft); text-align:center; font-family:'JetBrains Mono',monospace; line-height:1.3; padding-bottom:4px; }
+  .hmw-hour-label{ font-size:8px; color:var(--ink-soft); text-align:right; padding-right:4px; font-family:'JetBrains Mono',monospace; line-height:1; }
+  .hmw-cell{ height:11px; border-radius:2px; background:var(--cream); border:1px solid var(--line); }
+
+  /* ---------- Tab bar ---------- */
+  nav.tabbar{
+    position:fixed; bottom:0; left:0; right:0;
+    background:var(--card); border-top:1px solid var(--line);
+    padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+    display:flex; justify-content:center;
+    box-shadow: 0 -2px 10px rgba(43,38,32,0.05);
+  }
+  .tabbar-inner{ max-width:520px; width:100%; display:flex; }
+  .tab{
+    flex:1; background:none; border:none; display:flex; flex-direction:column; align-items:center; gap:3px;
+    padding:4px 0; color:var(--ink-soft); font-size:11px; font-family:'Inter',sans-serif; font-weight:500;
+    cursor:pointer;
+  }
+  .tab svg{ width:21px; height:21px; }
+  .tab.active{ color:var(--forest); }
+
+  .tab-panel{ display:none; }
+  .tab-panel.active{ display:block; }
+
+  /* ---------- Modal ---------- */
+  .overlay{
+    position:fixed; inset:0; background:rgba(43,38,32,0.4); display:none;
+    align-items:flex-end; justify-content:center; z-index:50;
+  }
+  .overlay.show{ display:flex; }
+  .modal{
+    background:var(--cream); width:100%; max-width:520px; border-radius:22px 22px 0 0;
+    padding:20px 20px calc(20px + env(safe-area-inset-bottom));
+    animation: slideup .2s ease;
+  }
+  @keyframes slideup{ from{ transform:translateY(30px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+  .modal h3{ font-family:'Fredoka',sans-serif; margin:0 0 14px; font-size:17px; }
+  .modal label{ font-size:12px; color:var(--ink-soft); display:block; margin-bottom:5px; }
+  .modal input[type=datetime-local], .modal input[type=date], .modal input[type=number]{
+    width:100%; padding:11px 12px; border-radius:12px; border:1px solid var(--line);
+    font-family:'JetBrains Mono',monospace; font-size:14px; background:var(--card); color:var(--ink); margin-bottom:16px;
+  }
+  .modal-actions{ display:flex; gap:10px; }
+  .modal-actions button{
+    flex:1; padding:12px; border-radius:12px; border:none; font-weight:600; font-size:14px; cursor:pointer;
+    font-family:'Inter',sans-serif;
+  }
+  .btn-save{ background:var(--forest); color:#fff; }
+  .btn-delete{ background:var(--poop-bg); color:var(--poop); }
+  .btn-cancel{ background:var(--line); color:var(--ink); }
+
+  .loading-screen{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    height:100vh; gap:10px; color:var(--ink-soft); font-size:13px;
+  }
+  .loading-screen svg{ width:38px; height:38px; animation: spin 1.2s linear infinite; color:var(--forest); }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .conn-banner{
+    display:none; background:#F6DCC8; color:#7A3E1E; border-bottom:1px solid #E8B48C;
+    font-size:12px; text-align:center; padding:9px 16px; line-height:1.4;
+  }
+
+  ::-webkit-scrollbar{ display:none; }
+</style>
+</head>
+<body>
+
+<div id="loading" class="loading-screen">
+  <svg viewBox="0 0 24 24" fill="none"><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+  <div>Fetching Pippa's data…</div>
+</div>
+
+<div class="app" id="app" style="display:none">
+
+  <div class="conn-banner" id="connBanner">
+    Couldn't reach the Google Sheet — your changes aren't saving right now. Check the Apps Script deployment and your connection, then reload.
+  </div>
+
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#3A5541" stroke-width="1.6">
+        <circle cx="12" cy="15" r="4.2"/>
+        <circle cx="6.2" cy="9.2" r="1.9"/>
+        <circle cx="17.8" cy="9.2" r="1.9"/>
+        <circle cx="9.5" cy="5.3" r="1.7"/>
+        <circle cx="14.5" cy="5.3" r="1.7"/>
+      </svg>
+      <div class="brand-text">
+        <h1>Pippa's Log</h1>
+      </div>
+    </div>
+    <button class="settings-btn" id="settingsBtn" aria-label="Settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </header>
+
+  <main>
+
+    <!-- LOG TAB -->
+    <div class="tab-panel active" id="panel-log">
+      <div class="stats">
+        <div class="stat">
+          <div class="label"><span class="dot" style="background:var(--pee)"></span>Since pee</div>
+          <div class="value" id="sincePee">–</div>
+        </div>
+        <div class="stat">
+          <div class="label"><span class="dot" style="background:var(--poop)"></span>Since poop</div>
+          <div class="value" id="sincePoop">–</div>
+        </div>
+        <div class="stat">
+          <div class="label"><span class="dot" style="background:var(--sleep)"></span>Since sleep</div>
+          <div class="value" id="sinceSleep">–</div>
+        </div>
+        <div class="stat">
+          <div class="label"><span class="dot" style="background:var(--sleep)"></span>Sleep today</div>
+          <div class="value" id="sleepToday">–</div>
+        </div>
+      </div>
+      <div class="log-grid">
+        <button class="log-btn pee" id="btnPee">
+          <span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2.5c3 4 6 7.7 6 11.3a6 6 0 1 1-12 0c0-3.6 3-7.3 6-11.3Z"/></svg></span>
+          Pee
+        </button>
+        <button class="log-btn poop" id="btnPoop">
+          <span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3c1 1.5-1 2-1 3.3 0 .8.7 1.2 1.6 1.2 1.7 0 2.4-1.5 3.6-1.5 1.7 0 2.8 1.6 2.8 3.4 0 1-.4 1.8-1 2.4 1.6.5 2.8 2 2.8 3.9 0 2.4-2.4 4.3-7.8 4.3S5.2 18.1 5.2 15.7c0-1.8 1-3.2 2.5-3.8-.8-.6-1.3-1.6-1.3-2.7 0-2 1.6-3.5 3.5-3.5.6 0 1.1.1 1.6.4"/></svg></span>
+          Poop
+        </button>
+        <button class="log-btn eat" id="btnEat">
+          <span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 11h17a7.5 7.5 0 0 1-15 0Z"/><path d="M3.5 11c0-1 1-1.8 2.2-1.8h12.6c1.2 0 2.2.8 2.2 1.8"/><path d="M8.5 9.2V5.5M12 9.2V4M15.5 9.2V5.5"/></svg></span>
+          Eat
+        </button>
+        <button class="log-btn sleep" id="btnSleep">
+          <span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg></span>
+          <span id="sleepLabel">Sleep</span>
+          <span class="sleep-timer" id="sleepTimer" style="display:none"></span>
+        </button>
+      </div>
+
+      <div class="just-logged" id="justLogged"></div>
+
+      <div id="historyList"></div>
+    </div>
+
+    <!-- TRENDS TAB -->
+    <div class="tab-panel" id="panel-trends">
+      <div class="trend-card">
+        <h3>House-training pace</h3>
+        <div id="trendStats"></div>
+      </div>
+
+      <div class="trend-card">
+        <h3>Weekly heat map</h3>
+        <div class="trend-toggle-row" id="trendActivityToggle">
+          <button class="trend-toggle" data-type="eat">Eat</button>
+          <button class="trend-toggle" data-type="pee">Pee</button>
+          <button class="trend-toggle" data-type="poop">Poop</button>
+          <button class="trend-toggle" data-type="sleep">Sleep</button>
+        </div>
+        <div class="hist-nav">
+          <button class="hist-nav-btn" id="trendPrevWeek" aria-label="Previous 7 days">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="hist-nav-label" id="trendWeekLabel"></div>
+          <button class="hist-nav-btn" id="trendNextWeek" aria-label="Next 7 days">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+        <div class="heatmap-week-wrap">
+          <div class="heatmap-week" id="trendHeatmap"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- WEIGHT TAB -->
+    <div class="tab-panel" id="panel-weight">
+      <div class="weight-header-row">
+        <div class="unit-toggle" id="unitToggle">
+          <button class="unit-btn" data-unit="kg">kg</button>
+          <button class="unit-btn" data-unit="lb">lb</button>
+        </div>
+        <button class="add-weight-btn" id="btnAddWeight">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Add weigh-in
+        </button>
+      </div>
+
+      <div class="stats" style="margin-bottom:16px;">
+        <div class="stat">
+          <div class="label"><span class="dot" style="background:var(--weight)"></span>Latest weight</div>
+          <div class="value" id="latestWeight">–</div>
+        </div>
+        <div class="stat">
+          <div class="label"><span class="dot" style="background:var(--weight)"></span>Since last weigh-in</div>
+          <div class="value" id="weightDelta">–</div>
+        </div>
+      </div>
+
+      <div class="trend-card">
+        <h3>Weight growth over time</h3>
+        <div id="weightChartWrap"></div>
+      </div>
+
+      <div class="section-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3A5541" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Weigh-in history
+      </div>
+      <div class="timeline" id="weightList"></div>
+    </div>
+
+  </main>
+
+  <nav class="tabbar">
+    <div class="tabbar-inner">
+      <button class="tab active" data-tab="log">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h16M4 6h16M4 18h10"/></svg>
+        Log
+      </button>
+      <button class="tab" data-tab="weight">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 15.5c1 .8 2.2 1.2 3.5 1.2s2.5-.4 3.5-1.2M9 9.5c.3-.6.9-1 1.5-1M13.5 9.5c.3-.6.9-1 1.5-1"/></svg>
+        Weight
+      </button>
+      <button class="tab" data-tab="trends">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M11 20V4M18 20v-7"/></svg>
+        Trends
+      </button>
+    </div>
+  </nav>
+</div>
+
+<div class="overlay" id="weightOverlay">
+  <div class="modal">
+    <h3 id="weightModalTitle">Add weigh-in</h3>
+    <label for="weightDate">Date</label>
+    <input type="date" id="weightDate">
+    <label for="weightValue" style="margin-top:2px;">Weight (<span id="weightUnitLabel">kg</span>)</label>
+    <input type="number" id="weightValue" inputmode="decimal" step="0.01" min="0" placeholder="0.0">
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn-delete" id="weightDelete" style="display:none">Delete</button>
+      <button class="btn-cancel" id="weightCancel">Cancel</button>
+      <button class="btn-save" id="weightSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="editOverlay">
+  <div class="modal">
+    <h3 id="editTitle">Edit entry</h3>
+    <label for="editTime" id="editTimeLabel">Time</label>
+    <input type="datetime-local" id="editTime">
+    <label for="editTimeEnd" id="editTimeEndLabel" style="display:none">End time</label>
+    <input type="datetime-local" id="editTimeEnd" style="display:none">
+    <div class="modal-actions">
+      <button class="btn-delete" id="editDelete">Delete</button>
+      <button class="btn-cancel" id="editCancel">Cancel</button>
+      <button class="btn-save" id="editSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="resetOverlay">
+  <div class="modal">
+    <h3>Clear all data?</h3>
+    <p style="font-size:13px;color:var(--ink-soft);margin-top:-6px;">This deletes every logged entry for Pippa, for both of you. This can't be undone.</p>
+    <div class="modal-actions" style="margin-top:10px;">
+      <button class="btn-cancel" id="resetCancel">Cancel</button>
+      <button class="btn-delete" id="resetConfirm">Clear everything</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="resetOverlay2">
+  <div class="modal">
+    <h3>Are you absolutely sure?</h3>
+    <p style="font-size:13px;color:var(--ink-soft);margin-top:-6px;">Last chance — <span id="resetCount"></span> will be permanently deleted for both you and your wife.</p>
+    <div class="modal-actions" style="margin-top:10px;">
+      <button class="btn-cancel" id="resetCancel2">Cancel</button>
+      <button class="btn-delete" id="resetConfirm2">Yes, delete everything</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbymTAseFKjyBi-ZLOdJD_Qfwdz9YnBSCi8_roS5kf_vuPZODHdCOfz8Mb2-CpKP7Qo4Eg/exec';
+const STORAGE_KEY = 'pippa-log-data';
+let entries = [];      // {id, type: 'pee'|'poop'|'sleep', start: ms, end: ms|null}
+let sleepStart = null;
+let notes = {};        // { 'YYYY-MM-DD': 'note text' }
+let weights = [];      // {id, date: 'YYYY-MM-DD', kg: number}
+let weightUnit = 'kg';
+let editingId = null;
+let editingWeightId = null;
+let sleepTickHandle = null;
+
+const ICONS = {
+  pee: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2.5c3 4 6 7.7 6 11.3a6 6 0 1 1-12 0c0-3.6 3-7.3 6-11.3Z"/></svg>',
+  poop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3c1 1.5-1 2-1 3.3 0 .8.7 1.2 1.6 1.2 1.7 0 2.4-1.5 3.6-1.5 1.7 0 2.8 1.6 2.8 3.4 0 1-.4 1.8-1 2.4 1.6.5 2.8 2 2.8 3.9 0 2.4-2.4 4.3-7.8 4.3S5.2 18.1 5.2 15.7c0-1.8 1-3.2 2.5-3.8-.8-.6-1.3-1.6-1.3-2.7 0-2 1.6-3.5 3.5-3.5.6 0 1.1.1 1.6.4"/></svg>',
+  sleep: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg>',
+  eat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 11h17a7.5 7.5 0 0 1-15 0Z"/><path d="M3.5 11c0-1 1-1.8 2.2-1.8h12.6c1.2 0 2.2.8 2.2 1.8"/><path d="M8.5 9.2V5.5M12 9.2V4M15.5 9.2V5.5"/></svg>'
+};
+const LABELS = { pee:'Pee', poop:'Poop', sleep:'Sleep', eat:'Eat' };
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+function showConnError(){
+  const b = document.getElementById('connBanner');
+  if(b) b.style.display = 'block';
+}
+
+async function loadData(){
+  try{
+    const res = await fetch(`${SHEET_API_URL}?key=${encodeURIComponent(STORAGE_KEY)}`);
+    if(!res.ok) throw new Error('Sheet request failed: ' + res.status);
+    const json = await res.json();
+    if(json && json.value){
+      const parsed = JSON.parse(json.value);
+      entries = parsed.entries || [];
+      sleepStart = parsed.sleepStart || null;
+      notes = parsed.notes || {};
+      weights = parsed.weights || [];
+      weightUnit = parsed.weightUnit || 'kg';
+    }
+  }catch(e){
+    console.log('No existing data yet, or failed to load from the sheet.', e);
+    entries = []; sleepStart = null; notes = {}; weights = []; weightUnit = 'kg';
+    showConnError();
+  }
+}
+
+async function saveData(){
+  try{
+    const value = JSON.stringify({entries, sleepStart, notes, weights, weightUnit});
+    const res = await fetch(SHEET_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight to Apps Script
+      body: JSON.stringify({ key: STORAGE_KEY, value })
+    });
+    if(!res.ok) throw new Error('Sheet save failed: ' + res.status);
+  }catch(e){
+    console.error('Failed to save to the sheet', e);
+    showConnError();
+  }
+}
+
+// ---------- time helpers ----------
+function fmtTime(ms){
+  return new Date(ms).toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+}
+function fmtDateHeader(dateKey){
+  const d = new Date(dateKey + 'T12:00:00');
+  const today = new Date(); today.setHours(12,0,0,0);
+  const diffDays = Math.round((today - d) / 86400000);
+  if(diffDays === 0) return 'Today';
+  if(diffDays === 1) return 'Yesterday';
+  return d.toLocaleDateString([], {weekday:'short', month:'short', day:'numeric'});
+}
+function dateKey(ms){
+  const d = new Date(ms);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function fmtElapsed(ms){
+  if(ms == null) return '–';
+  const mins = Math.floor(ms/60000);
+  const h = Math.floor(mins/60), m = mins%60;
+  if(h <= 0) return m + 'm';
+  return h + 'h ' + m + 'm';
+}
+function fmtDuration(ms){
+  const mins = Math.round(ms/60000);
+  const h = Math.floor(mins/60), m = mins%60;
+  if(h <= 0) return m + ' min';
+  return h + 'h ' + m + 'm';
+}
+function toLocalInputValue(ms){
+  const d = new Date(ms - new Date().getTimezoneOffset()*60000);
+  return d.toISOString().slice(0,16);
+}
+function fromLocalInputValue(str){
+  return new Date(str).getTime();
+}
+
+// ---------- rendering ----------
+function render(){
+  renderQuickStats();
+  renderHistory();
+  renderTrends();
+  renderWeightTab();
+  renderSleepButton();
+}
+
+function renderQuickStats(){
+  const lastPee = [...entries].filter(e=>e.type==='pee').sort((a,b)=>b.start-a.start)[0];
+  const lastPoop = [...entries].filter(e=>e.type==='poop').sort((a,b)=>b.start-a.start)[0];
+  const lastSleepEntry = [...entries].filter(e=>e.type==='sleep' && e.end).sort((a,b)=>b.end-a.end)[0];
+
+  document.getElementById('sincePee').textContent = lastPee ? fmtElapsed(Date.now()-lastPee.start) : '–';
+  document.getElementById('sincePoop').textContent = lastPoop ? fmtElapsed(Date.now()-lastPoop.start) : '–';
+
+  const sinceSleepEl = document.getElementById('sinceSleep');
+  if(sleepStart){
+    sinceSleepEl.textContent = 'Sleeping now';
+  } else if(lastSleepEntry){
+    sinceSleepEl.textContent = fmtElapsed(Date.now()-lastSleepEntry.end);
+  } else {
+    sinceSleepEl.textContent = '–';
+  }
+
+  const { sleepFrac } = computeHeatmapData(dateKey(Date.now()));
+  const totalSleepToday = sleepFrac.reduce((a,b)=>a+b, 0);
+  document.getElementById('sleepToday').textContent = totalSleepToday.toFixed(1) + 'h';
+}
+
+function entryRow(e){
+  const div = document.createElement('div');
+  div.className = 'entry ' + e.type;
+  div.onclick = () => openEdit(e.id);
+  let metaText = '';
+  if(e.type === 'sleep'){
+    metaText = e.end ? ('Slept ' + fmtDuration(e.end - e.start)) : 'Sleeping now…';
+  }
+  div.innerHTML = `
+    <div class="icon-circle">${ICONS[e.type]}</div>
+    <div class="info">
+      <div class="type">${LABELS[e.type]}</div>
+      ${metaText ? `<div class="meta">${metaText}</div>` : ''}
+    </div>
+    <div class="time">${fmtTime(e.start)}</div>
+  `;
+  return div;
+}
+
+let selectedHistoryDate = dateKey(Date.now());
+
+const HM_RGB = { eat:'110,140,78', pee:'91,155,213', poop:'217,178,60', sleep:'155,150,137' };
+const HM_ROWS = [ ['eat','Eat'], ['pee','Pee'], ['poop','Poop'], ['sleep','Sleep'] ];
+
+function getDayBounds(key){
+  const start = new Date(key+'T00:00:00').getTime();
+  return [start, start + 86400000];
+}
+
+function accumulateSleepHours(start, end, dayStart, dayEnd, arr){
+  const s = Math.max(start, dayStart);
+  const en = Math.min(end == null ? Date.now() : end, dayEnd);
+  if(en <= s) return;
+  for(let h=0; h<24; h++){
+    const hourStart = dayStart + h*3600000;
+    const hourEnd = hourStart + 3600000;
+    const overlap = Math.min(en, hourEnd) - Math.max(s, hourStart);
+    if(overlap > 0) arr[h] = Math.min(1, arr[h] + overlap/3600000);
+  }
+}
+
+function computeHeatmapData(key){
+  const [dayStart, dayEnd] = getDayBounds(key);
+  const counts = { eat:new Array(24).fill(0), pee:new Array(24).fill(0), poop:new Array(24).fill(0) };
+  const sleepFrac = new Array(24).fill(0);
+  entries.forEach(e => {
+    if(e.type === 'sleep'){
+      accumulateSleepHours(e.start, e.end, dayStart, dayEnd, sleepFrac);
+    } else if(dateKey(e.start) === key){
+      const h = new Date(e.start).getHours();
+      counts[e.type][h] += 1;
+    }
+  });
+  if(sleepStart) accumulateSleepHours(sleepStart, null, dayStart, dayEnd, sleepFrac);
+  return { counts, sleepFrac };
+}
+
+function heatCellStyle(type, val){
+  if(!val) return `background:var(--cream);`;
+  const rgb = HM_RGB[type];
+  const alpha = type === 'sleep' ? Math.min(1, 0.25 + val*0.75) : Math.min(1, 0.35 + val*0.3);
+  return `background:rgba(${rgb},${alpha}); border-color:transparent;`;
+}
+
+function renderHeatmap(key){
+  const { counts, sleepFrac } = computeHeatmapData(key);
+  const data = { eat:counts.eat, pee:counts.pee, poop:counts.poop, sleep:sleepFrac };
+  let html = '<div class="hm-row-label"></div>';
+  for(let h=0; h<24; h++){
+    html += `<div class="hm-hour-label">${h % 3 === 0 ? h : ''}</div>`;
+  }
+  HM_ROWS.forEach(([type,label]) => {
+    html += `<div class="hm-row-label">${label}</div>`;
+    for(let h=0; h<24; h++){
+      const val = data[type][h];
+      const title = type === 'sleep' ? Math.round(val*60)+'m asleep' : (val + ' ' + label.toLowerCase() + (val===1?'':'s'));
+      html += `<div class="hm-cell" title="${val ? title : ''}" style="${heatCellStyle(type, val)}"></div>`;
+    }
+  });
+  return html;
+}
+
+function shiftHistoryDay(delta){
+  const todayKey = dateKey(Date.now());
+  const d = new Date(selectedHistoryDate + 'T12:00:00');
+  d.setDate(d.getDate() + delta);
+  const newKey = dateKey(d.getTime());
+  if(newKey > todayKey) return;
+  selectedHistoryDate = newKey;
+  renderHistory();
+}
+
+let notesEditing = new Set(); // dateKeys currently showing an (possibly empty) open editor
+
+function autosizeTextarea(el){
+  el.style.height = 'auto';
+  el.style.height = el.scrollHeight + 'px';
+}
+
+async function saveNote(key, value){
+  if(!value.trim()){
+    delete notes[key];
+  } else {
+    notes[key] = value;
+  }
+  await saveData();
+}
+
+function renderNotesInto(container, key){
+  container.innerHTML = '';
+  const existing = notes[key] || '';
+  const showEditor = !!existing || notesEditing.has(key);
+
+  if(!showEditor){
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'add-note-btn';
+    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg> Add a note for this day`;
+    btn.onclick = () => {
+      notesEditing.add(key);
+      renderNotesInto(container, key);
+      const ta = container.querySelector('textarea');
+      if(ta) ta.focus();
+    };
+    container.appendChild(btn);
+    return;
+  }
+
+  const card = document.createElement('div');
+  card.className = 'notes-card';
+  card.innerHTML = `<div class="notes-label">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 19.5V6a2 2 0 0 1 2-2h9l5 5v10.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/><path d="M14 4v5h5"/></svg>
+    Notes
+  </div>`;
+  const ta = document.createElement('textarea');
+  ta.className = 'notes-textarea';
+  ta.placeholder = 'Write a note about today… 🐾';
+  ta.value = existing;
+  ta.rows = 1;
+  card.appendChild(ta);
+  container.appendChild(card);
+  autosizeTextarea(ta);
+
+  let saveTimer = null;
+  ta.addEventListener('input', () => {
+    autosizeTextarea(ta);
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => saveNote(key, ta.value), 400);
+  });
+  ta.addEventListener('blur', () => {
+    clearTimeout(saveTimer);
+    saveNote(key, ta.value);
+    if(!ta.value.trim()){
+      notesEditing.delete(key);
+      renderNotesInto(container, key);
+    }
+  });
+}
+
+function renderHistory(){
+  const container = document.getElementById('historyList');
+  container.innerHTML = '';
+  const todayKey = dateKey(Date.now());
+  const isToday = selectedHistoryDate === todayKey;
+
+  const nav = document.createElement('div');
+  nav.className = 'hist-nav';
+  nav.innerHTML = `
+    <button class="hist-nav-btn" id="histPrev" aria-label="Previous day">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="hist-nav-label">${fmtDateHeader(selectedHistoryDate)}<span class="sub">${new Date(selectedHistoryDate+'T12:00:00').toLocaleDateString([], {year:'numeric', month:'long', day:'numeric'})}</span></div>
+    <button class="hist-nav-btn ${isToday ? 'disabled' : ''}" id="histNext" aria-label="Next day">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+    </button>
+  `;
+  container.appendChild(nav);
+
+  const hmCard = document.createElement('div');
+  hmCard.className = 'heatmap-card';
+  hmCard.innerHTML = `<div class="heatmap">${renderHeatmap(selectedHistoryDate)}</div>
+    <div class="heatmap-legend">Darker = more activity that hour · tap a day to see details below</div>`;
+  container.appendChild(hmCard);
+
+  document.getElementById('histPrev').onclick = () => shiftHistoryDay(-1);
+  document.getElementById('histNext').onclick = () => shiftHistoryDay(1);
+
+  const notesWrap = document.createElement('div');
+  container.appendChild(notesWrap);
+  renderNotesInto(notesWrap, selectedHistoryDate);
+
+  const dayEntries = entries.filter(e => dateKey(e.start) === selectedHistoryDate).sort((a,b)=>b.start-a.start);
+  const listTitle = document.createElement('div');
+  listTitle.className = 'section-title';
+  listTitle.textContent = dayEntries.length ? `${fmtDateHeader(selectedHistoryDate)}'s entries` : '';
+  if(dayEntries.length) container.appendChild(listTitle);
+
+  if(dayEntries.length === 0){
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = 'Nothing logged on this day.';
+    container.appendChild(empty);
+    return;
+  }
+  const tl = document.createElement('div');
+  tl.className = 'timeline';
+  dayEntries.forEach(e => tl.appendChild(entryRow(e)));
+  container.appendChild(tl);
+}
+
+let trendActivity = 'pee';
+let trendWeekEndKey = dateKey(Date.now());
+
+function get7DayWindow(endKey){
+  const end = new Date(endKey + 'T12:00:00');
+  const arr = [];
+  for(let i=6; i>=0; i--){
+    const d = new Date(end);
+    d.setDate(d.getDate() - i);
+    arr.push(dateKey(d.getTime()));
+  }
+  return arr;
+}
+
+function shiftTrendWeek(deltaWeeks){
+  const todayKey = dateKey(Date.now());
+  const d = new Date(trendWeekEndKey + 'T12:00:00');
+  d.setDate(d.getDate() + deltaWeeks*7);
+  const newKey = dateKey(d.getTime());
+  if(newKey > todayKey) return;
+  trendWeekEndKey = newKey;
+  renderTrendHeatmap();
+}
+
+function setTrendActivity(type){
+  trendActivity = type;
+  renderTrendHeatmap();
+}
+
+function renderTrendHeatmap(){
+  document.querySelectorAll('.trend-toggle').forEach(b => {
+    b.classList.toggle('active', b.dataset.type === trendActivity);
+  });
+
+  const days = get7DayWindow(trendWeekEndKey);
+  const todayKey = dateKey(Date.now());
+  document.getElementById('trendNextWeek').classList.toggle('disabled', trendWeekEndKey === todayKey);
+
+  const startLabel = new Date(days[0]+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'});
+  const endLabel = new Date(days[6]+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'});
+  document.getElementById('trendWeekLabel').textContent = `${startLabel} – ${endLabel}`;
+
+  const dayValues = days.map(k => {
+    const { counts, sleepFrac } = computeHeatmapData(k);
+    return trendActivity === 'sleep' ? sleepFrac : counts[trendActivity];
+  });
+
+  let html = '<div class="hmw-hour-label"></div>';
+  days.forEach(k => {
+    const d = new Date(k+'T12:00:00');
+    html += `<div class="hmw-day-label">${d.toLocaleDateString([], {weekday:'narrow'})}<br>${d.getDate()}</div>`;
+  });
+  const label = LABELS[trendActivity].toLowerCase();
+  for(let h=0; h<24; h++){
+    html += `<div class="hmw-hour-label">${h % 3 === 0 ? h : ''}</div>`;
+    dayValues.forEach(valsArr => {
+      const val = valsArr[h];
+      const title = trendActivity === 'sleep'
+        ? (val ? Math.round(val*60)+'m asleep' : '')
+        : (val ? val + ' ' + label + (val===1?'':'s') : '');
+      html += `<div class="hmw-cell" title="${title}" style="${heatCellStyle(trendActivity, val)}"></div>`;
+    });
+  }
+  document.getElementById('trendHeatmap').innerHTML = html;
+}
+
+function renderTrends(){
+  const days = [];
+  for(let i=6;i>=0;i--){
+    const d = new Date();
+    d.setHours(12,0,0,0);
+    d.setDate(d.getDate()-i);
+    days.push(dateKey(d.getTime()));
+  }
+  const dayData = days.map(k => {
+    const dayEntries = entries.filter(e => dateKey(e.start) === k);
+    const pee = dayEntries.filter(e=>e.type==='pee').length;
+    const poop = dayEntries.filter(e=>e.type==='poop').length;
+    const sleepHrs = dayEntries.filter(e=>e.type==='sleep' && e.end).reduce((s,e)=> s + (e.end-e.start), 0) / 3600000;
+    return {k, pee, poop, sleepHrs};
+  });
+
+  // average gap between pees, using only pees from the last 7 days
+  const rangeStart = getDayBounds(days[0])[0];
+  const pees = entries.filter(e => e.type==='pee' && e.start >= rangeStart).sort((a,b)=>a.start-b.start);
+  let avgGap = null;
+  if(pees.length >= 2){
+    const gaps = [];
+    for(let i=1;i<pees.length;i++) gaps.push(pees[i].start - pees[i-1].start);
+    avgGap = gaps.reduce((a,b)=>a+b,0)/gaps.length;
+  }
+  const avgPeePerDay = dayData.reduce((s,d)=>s+d.pee,0) / 7;
+  const avgPoopPerDay = dayData.reduce((s,d)=>s+d.poop,0) / 7;
+  const avgSleepHrsPerDay = dayData.reduce((s,d)=>s+d.sleepHrs,0) / 7;
+
+  const statsEl = document.getElementById('trendStats');
+  statsEl.innerHTML = `
+    <div class="kv-row"><span class="k">Avg time between pees</span><span class="v">${avgGap ? fmtDuration(avgGap) : '–'}</span></div>
+    <div class="kv-row"><span class="k">Avg pees per day</span><span class="v">${avgPeePerDay.toFixed(1)}</span></div>
+    <div class="kv-row"><span class="k">Avg poops per day</span><span class="v">${avgPoopPerDay.toFixed(1)}</span></div>
+    <div class="kv-row"><span class="k">Avg sleep, hrs per day</span><span class="v">${avgSleepHrsPerDay.toFixed(1)}</span></div>
+  `;
+
+  renderTrendHeatmap();
+}
+
+// ---------- Weight tab ----------
+function kgToLb(kg){ return kg * 2.20462; }
+function lbToKg(lb){ return lb / 2.20462; }
+function toDisplayWeight(kg){ return weightUnit === 'lb' ? kgToLb(kg) : kg; }
+function fromDisplayWeight(val){ return weightUnit === 'lb' ? lbToKg(val) : val; }
+function fmtWeightUnit(kg){ return toDisplayWeight(kg).toFixed(1) + ' ' + weightUnit; }
+
+function renderWeightTab(){
+  document.querySelectorAll('.unit-btn').forEach(b => b.classList.toggle('active', b.dataset.unit === weightUnit));
+  const unitLabelEl = document.getElementById('weightUnitLabel');
+  if(unitLabelEl) unitLabelEl.textContent = weightUnit;
+  renderWeightStats();
+  renderWeightChart();
+  renderWeightList();
+}
+
+function renderWeightStats(){
+  const sortedAsc = [...weights].sort((a,b)=> a.date.localeCompare(b.date));
+  const latestEl = document.getElementById('latestWeight');
+  const deltaEl = document.getElementById('weightDelta');
+  if(sortedAsc.length === 0){
+    latestEl.textContent = '–';
+    deltaEl.textContent = '–';
+    return;
+  }
+  const latest = sortedAsc[sortedAsc.length - 1];
+  latestEl.textContent = fmtWeightUnit(latest.kg);
+  if(sortedAsc.length < 2){
+    deltaEl.textContent = 'First weigh-in';
+    return;
+  }
+  const prev = sortedAsc[sortedAsc.length - 2];
+  const deltaKg = latest.kg - prev.kg;
+  const deltaDisplay = toDisplayWeight(Math.abs(deltaKg)).toFixed(2);
+  const sign = deltaKg > 0 ? '+' : (deltaKg < 0 ? '−' : '');
+  const days = Math.round((new Date(latest.date+'T12:00:00') - new Date(prev.date+'T12:00:00')) / 86400000);
+  deltaEl.textContent = `${sign}${deltaDisplay} ${weightUnit} (${days}d)`;
+}
+
+function renderWeightChart(){
+  const wrap = document.getElementById('weightChartWrap');
+  const sorted = [...weights].sort((a,b)=> a.date.localeCompare(b.date));
+  if(sorted.length < 2){
+    wrap.innerHTML = `<div class="weight-chart-empty">Add at least two weigh-ins to see the growth chart.</div>`;
+    return;
+  }
+  const W = 320, H = 150, padL = 30, padR = 12, padT = 14, padB = 20;
+  const xs = sorted.map(w => new Date(w.date+'T12:00:00').getTime());
+  const ys = sorted.map(w => toDisplayWeight(w.kg));
+  const minX = xs[0], maxX = xs[xs.length-1];
+  const minYraw = Math.min(...ys), maxYraw = Math.max(...ys);
+  const yPad = Math.max(0.3, (maxYraw - minYraw) * 0.2);
+  const minY = minYraw - yPad, maxY = maxYraw + yPad;
+  const xScale = x => maxX === minX ? padL + (W-padL-padR)/2 : padL + ((x-minX)/(maxX-minX)) * (W-padL-padR);
+  const yScale = y => padT + (1 - (y-minY)/(maxY-minY)) * (H-padT-padB);
+
+  const pts = sorted.map((w,i) => `${xScale(xs[i]).toFixed(1)},${yScale(ys[i]).toFixed(1)}`).join(' ');
+  const circles = sorted.map((w,i) => {
+    const cx = xScale(xs[i]).toFixed(1), cy = yScale(ys[i]).toFixed(1);
+    const title = `${new Date(w.date+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'})}: ${fmtWeightUnit(w.kg)}`;
+    return `<circle class="weight-pt" cx="${cx}" cy="${cy}" r="3"><title>${title}</title></circle>`;
+  }).join('');
+
+  const firstLabel = new Date(sorted[0].date+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'});
+  const lastLabel = new Date(sorted[sorted.length-1].date+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'});
+
+  wrap.innerHTML = `
+    <svg class="weight-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+      <line class="weight-grid-line" x1="${padL}" y1="${padT}" x2="${W-padR}" y2="${padT}"/>
+      <line class="weight-grid-line" x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}"/>
+      <text class="weight-axis-label" x="2" y="${padT+3}">${maxY.toFixed(1)}</text>
+      <text class="weight-axis-label" x="2" y="${H-padB+3}">${minY.toFixed(1)}</text>
+      <text class="weight-axis-label" x="${padL}" y="${H-4}">${firstLabel}</text>
+      <text class="weight-axis-label" x="${W-padR-26}" y="${H-4}">${lastLabel}</text>
+      <polyline class="weight-line" points="${pts}"/>
+      ${circles}
+    </svg>`;
+}
+
+function weightRow(w){
+  const div = document.createElement('div');
+  div.className = 'entry weight';
+  div.onclick = () => openWeightModal(w.id);
+  const dateLabel = new Date(w.date+'T12:00:00').toLocaleDateString([], {weekday:'short', month:'short', day:'numeric'});
+  div.innerHTML = `
+    <div class="icon-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 15.5c1 .8 2.2 1.2 3.5 1.2s2.5-.4 3.5-1.2M9 9.5c.3-.6.9-1 1.5-1M13.5 9.5c.3-.6.9-1 1.5-1"/></svg></div>
+    <div class="info">
+      <div class="type">${fmtWeightUnit(w.kg)}</div>
+      <div class="meta">${dateLabel}</div>
+    </div>
+  `;
+  return div;
+}
+
+function renderWeightList(){
+  const list = document.getElementById('weightList');
+  list.innerHTML = '';
+  const sortedDesc = [...weights].sort((a,b)=> b.date.localeCompare(a.date));
+  if(sortedDesc.length === 0){
+    list.innerHTML = `<div class="empty">No weigh-ins yet — tap "Add weigh-in" to log Pippa's first weight.</div>`;
+    return;
+  }
+  sortedDesc.forEach(w => list.appendChild(weightRow(w)));
+}
+
+function openWeightModal(id){
+  editingWeightId = id;
+  const modalTitle = document.getElementById('weightModalTitle');
+  const dateInput = document.getElementById('weightDate');
+  const valueInput = document.getElementById('weightValue');
+  const deleteBtn = document.getElementById('weightDelete');
+  document.getElementById('weightUnitLabel').textContent = weightUnit;
+  if(id){
+    const w = weights.find(x => x.id === id);
+    if(!w) return;
+    modalTitle.textContent = 'Edit weigh-in';
+    dateInput.value = w.date;
+    valueInput.value = toDisplayWeight(w.kg).toFixed(2);
+    deleteBtn.style.display = 'block';
+  } else {
+    modalTitle.textContent = 'Add weigh-in';
+    dateInput.value = dateKey(Date.now());
+    valueInput.value = '';
+    deleteBtn.style.display = 'none';
+  }
+  document.getElementById('weightOverlay').classList.add('show');
+}
+function closeWeightModal(){
+  document.getElementById('weightOverlay').classList.remove('show');
+  editingWeightId = null;
+}
+async function saveWeightModal(){
+  const dateInput = document.getElementById('weightDate');
+  const valueInput = document.getElementById('weightValue');
+  const dateVal = dateInput.value;
+  const num = parseFloat(valueInput.value);
+  if(!dateVal || isNaN(num) || num <= 0){
+    valueInput.focus();
+    return;
+  }
+  const kg = fromDisplayWeight(num);
+  if(editingWeightId){
+    const w = weights.find(x => x.id === editingWeightId);
+    if(w){ w.date = dateVal; w.kg = kg; }
+  } else {
+    weights.push({id: uid(), date: dateVal, kg});
+  }
+  await saveData();
+  closeWeightModal();
+  renderWeightTab();
+}
+async function deleteWeightModal(){
+  weights = weights.filter(x => x.id !== editingWeightId);
+  await saveData();
+  closeWeightModal();
+  renderWeightTab();
+}
+async function setWeightUnit(u){
+  if(weightUnit === u) return;
+  weightUnit = u;
+  await saveData();
+  renderWeightTab();
+}
+
+function renderSleepButton(){
+  const btn = document.getElementById('btnSleep');
+  const label = document.getElementById('sleepLabel');
+  const timer = document.getElementById('sleepTimer');
+  if(sleepStart){
+    btn.classList.add('active');
+    label.textContent = 'End sleep';
+    timer.style.display = 'block';
+    timer.textContent = fmtElapsed(Date.now() - sleepStart);
+  } else {
+    btn.classList.remove('active');
+    label.textContent = 'Sleep';
+    timer.style.display = 'none';
+  }
+}
+
+function flashLogged(text){
+  const el = document.getElementById('justLogged');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(flashLogged._t);
+  flashLogged._t = setTimeout(()=> el.classList.remove('show'), 1600);
+}
+
+// ---------- actions ----------
+async function logInstant(type){
+  const e = {id: uid(), type, start: Date.now(), end: null};
+  entries.push(e);
+  await saveData();
+  render();
+  flashLogged(LABELS[type] + ' logged at ' + fmtTime(e.start));
+}
+
+async function toggleSleep(){
+  if(sleepStart){
+    entries.push({id: uid(), type:'sleep', start: sleepStart, end: Date.now()});
+    sleepStart = null;
+    await saveData();
+    render();
+    flashLogged('Sleep logged');
+  } else {
+    sleepStart = Date.now();
+    await saveData();
+    render();
+  }
+}
+
+function openEdit(id){
+  const e = entries.find(x=>x.id===id);
+  if(!e) return;
+  editingId = id;
+  document.getElementById('editTitle').textContent = 'Edit ' + LABELS[e.type].toLowerCase();
+  document.getElementById('editTime').value = toLocalInputValue(e.start);
+  const endLabel = document.getElementById('editTimeEndLabel');
+  const endInput = document.getElementById('editTimeEnd');
+  document.getElementById('editTimeLabel').textContent = e.type === 'sleep' ? 'Start time' : 'Time';
+  if(e.type === 'sleep'){
+    endLabel.style.display = 'block';
+    endInput.style.display = 'block';
+    endInput.value = toLocalInputValue(e.end || Date.now());
+  } else {
+    endLabel.style.display = 'none';
+    endInput.style.display = 'none';
+  }
+  document.getElementById('editOverlay').classList.add('show');
+}
+function closeEdit(){
+  document.getElementById('editOverlay').classList.remove('show');
+  editingId = null;
+}
+
+async function saveEdit(){
+  const e = entries.find(x=>x.id===editingId);
+  if(!e){ closeEdit(); return; }
+  e.start = fromLocalInputValue(document.getElementById('editTime').value);
+  if(e.type === 'sleep'){
+    e.end = fromLocalInputValue(document.getElementById('editTimeEnd').value);
+  }
+  await saveData();
+  closeEdit();
+  render();
+}
+async function deleteEdit(){
+  entries = entries.filter(x=>x.id!==editingId);
+  await saveData();
+  closeEdit();
+  render();
+}
+
+function switchTab(name){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.tab===name));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  if(name === 'trends') renderTrends();
+}
+
+// ---------- init ----------
+async function init(){
+  await loadData();
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  render();
+
+  document.getElementById('btnPee').onclick = () => logInstant('pee');
+  document.getElementById('btnPoop').onclick = () => logInstant('poop');
+  document.getElementById('btnSleep').onclick = toggleSleep;
+  document.getElementById('btnEat').onclick = () => logInstant('eat');
+
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
+
+  document.querySelectorAll('.trend-toggle').forEach(b => b.onclick = () => setTrendActivity(b.dataset.type));
+  document.getElementById('trendPrevWeek').onclick = () => shiftTrendWeek(-1);
+  document.getElementById('trendNextWeek').onclick = () => shiftTrendWeek(1);
+
+  document.getElementById('editCancel').onclick = closeEdit;
+  document.getElementById('editSave').onclick = saveEdit;
+  document.getElementById('editDelete').onclick = deleteEdit;
+  document.getElementById('editOverlay').onclick = (ev) => { if(ev.target.id==='editOverlay') closeEdit(); };
+
+  document.getElementById('btnAddWeight').onclick = () => openWeightModal(null);
+  document.querySelectorAll('.unit-btn').forEach(b => b.onclick = () => setWeightUnit(b.dataset.unit));
+  document.getElementById('weightCancel').onclick = closeWeightModal;
+  document.getElementById('weightSave').onclick = saveWeightModal;
+  document.getElementById('weightDelete').onclick = deleteWeightModal;
+  document.getElementById('weightOverlay').onclick = (ev) => { if(ev.target.id==='weightOverlay') closeWeightModal(); };
+
+  document.getElementById('settingsBtn').onclick = () => document.getElementById('resetOverlay').classList.add('show');
+  document.getElementById('resetCancel').onclick = () => document.getElementById('resetOverlay').classList.remove('show');
+  document.getElementById('resetConfirm').onclick = () => {
+    document.getElementById('resetOverlay').classList.remove('show');
+    const n = entries.length + (sleepStart ? 1 : 0);
+    document.getElementById('resetCount').textContent = n === 1 ? '1 entry' : (n + ' entries');
+    document.getElementById('resetOverlay2').classList.add('show');
+  };
+  document.getElementById('resetOverlay').onclick = (ev) => { if(ev.target.id==='resetOverlay') document.getElementById('resetOverlay').classList.remove('show'); };
+
+  document.getElementById('resetCancel2').onclick = () => document.getElementById('resetOverlay2').classList.remove('show');
+  document.getElementById('resetConfirm2').onclick = async () => {
+    entries = []; sleepStart = null;
+    await saveData();
+    document.getElementById('resetOverlay2').classList.remove('show');
+    render();
+  };
+  document.getElementById('resetOverlay2').onclick = (ev) => { if(ev.target.id==='resetOverlay2') document.getElementById('resetOverlay2').classList.remove('show'); };
+
+  setInterval(() => { renderQuickStats(); if(sleepStart) renderSleepButton(); }, 15000);
+}
+
+init();
+</script>
+</body>
+</html>
