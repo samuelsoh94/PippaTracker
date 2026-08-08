@@ -214,19 +214,48 @@
   .weight-chart-empty{ text-align:center; padding:20px 10px; color:var(--ink-soft); font-size:13px; }
   .weight-svg{ width:100%; height:auto; display:block; }
 
-  .weight-range-controls{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:12px; margin-bottom:10px; }
-  .weight-range-field{ flex:1; min-width:110px; }
-  .weight-range-field label{ display:block; font-size:10px; color:var(--ink-soft); font-family:'JetBrains Mono',monospace; margin-bottom:2px; }
-  .weight-range-field input[type=range]{
-    width:100%; accent-color:var(--weight); height:20px; margin:0; cursor:pointer;
+  .weight-chart-outer{ position:relative; }
+  .weight-tooltip{
+    position:absolute; transform:translate(-50%,-130%); background:var(--ink); color:#fff;
+    font-family:'JetBrains Mono',monospace; font-size:11px; padding:5px 9px; border-radius:8px;
+    white-space:nowrap; pointer-events:none; opacity:0; transition:opacity .12s ease; z-index:5;
+  }
+  .weight-tooltip::after{
+    content:''; position:absolute; left:50%; top:100%; transform:translateX(-50%);
+    border:5px solid transparent; border-top-color:var(--ink);
+  }
+  .weight-tooltip.show{ opacity:1; }
+
+  .weight-range-controls{ margin-top:8px; }
+  .weight-slider{ position:relative; height:26px; margin:2px 3.75% 0 8.125%; }
+  .weight-slider-track{ position:absolute; top:50%; left:0; right:0; height:4px; transform:translateY(-50%); background:var(--line); border-radius:2px; }
+  .weight-slider-range{ position:absolute; top:50%; height:4px; transform:translateY(-50%); background:var(--weight); border-radius:2px; }
+  .weight-slider input[type=range]{
+    position:absolute; top:0; left:0; width:100%; height:26px; margin:0; background:none;
+    -webkit-appearance:none; appearance:none; pointer-events:none; z-index:2;
+  }
+  .weight-slider input[type=range]::-webkit-slider-runnable-track{ background:transparent; height:26px; }
+  .weight-slider input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; pointer-events:auto;
+    width:16px; height:16px; border-radius:50%; background:var(--weight); border:2px solid var(--card);
+    box-shadow:0 1px 3px rgba(43,38,32,0.3); cursor:pointer; margin-top:5px;
+  }
+  .weight-slider input[type=range]::-moz-range-track{ background:transparent; height:26px; border:none; }
+  .weight-slider input[type=range]::-moz-range-thumb{
+    pointer-events:auto; width:16px; height:16px; border-radius:50%; background:var(--weight); border:2px solid var(--card); cursor:pointer;
+  }
+  .weight-range-labels{
+    display:flex; align-items:center; justify-content:center; gap:6px; margin-top:2px;
+    font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-soft);
   }
   .weight-range-reset{
-    background:none; border:1px solid var(--line); border-radius:10px; padding:6px 10px;
+    margin-left:10px; background:none; border:1px solid var(--line); border-radius:10px; padding:4px 9px;
     font-family:'Inter',sans-serif; font-weight:600; font-size:11px; color:var(--ink-soft); cursor:pointer;
     white-space:nowrap;
   }
   .weight-range-reset:active{ background:var(--cream); }
-  .weight-pt{ fill:var(--weight); }
+  .weight-pt{ fill:var(--weight); cursor:pointer; }
+  .weight-pt-hit{ cursor:pointer; }
   .weight-line{ fill:none; stroke:var(--weight); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
   .weight-axis-label{ font-family:'JetBrains Mono',monospace; font-size:8px; fill:var(--ink-soft); }
   .weight-grid-line{ stroke:var(--line); stroke-width:1; }
@@ -472,18 +501,24 @@
 
       <div class="trend-card">
         <h3>Weight growth over time</h3>
+        <div class="weight-chart-outer" id="weightChartOuter">
+          <div id="weightChartWrap"></div>
+          <div class="weight-tooltip" id="weightTooltip"></div>
+        </div>
         <div class="weight-range-controls" id="weightRangeControls">
-          <div class="weight-range-field">
-            <label>From <span id="weightRangeFromLabel"></span></label>
+          <div class="weight-slider">
+            <div class="weight-slider-track"></div>
+            <div class="weight-slider-range" id="weightRangeHighlight"></div>
             <input type="range" id="weightRangeFrom" min="0" max="0" value="0">
-          </div>
-          <div class="weight-range-field">
-            <label>To <span id="weightRangeToLabel"></span></label>
             <input type="range" id="weightRangeTo" min="0" max="0" value="0">
           </div>
-          <button class="weight-range-reset" id="weightRangeReset">Reset zoom</button>
+          <div class="weight-range-labels">
+            <span id="weightRangeFromLabel"></span>
+            <span>–</span>
+            <span id="weightRangeToLabel"></span>
+            <button class="weight-range-reset" id="weightRangeReset">Reset zoom</button>
+          </div>
         </div>
-        <div id="weightChartWrap"></div>
       </div>
 
       <div class="section-title">
@@ -1078,17 +1113,52 @@ function renderWeightStats(){
   deltaEl.textContent = `${sign}${deltaDisplay} ${weightUnit} (${days}d)`;
 }
 
+function updateWeightSliderVisual(){
+  const fromSlider = document.getElementById('weightRangeFrom');
+  const toSlider = document.getElementById('weightRangeTo');
+  const highlight = document.getElementById('weightRangeHighlight');
+  const max = parseInt(fromSlider.max, 10);
+  if(!max || max <= 0){
+    if(highlight){ highlight.style.left = '0%'; highlight.style.width = '100%'; }
+    return;
+  }
+  const fromPct = (parseInt(fromSlider.value, 10) / max) * 100;
+  const toPct = (parseInt(toSlider.value, 10) / max) * 100;
+  if(highlight){
+    highlight.style.left = fromPct + '%';
+    highlight.style.width = Math.max(0, toPct - fromPct) + '%';
+  }
+}
+
+function showWeightTooltip(el){
+  const outer = document.getElementById('weightChartOuter');
+  const tooltip = document.getElementById('weightTooltip');
+  if(!outer || !tooltip) return;
+  const outerRect = outer.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  tooltip.textContent = el.dataset.label || '';
+  tooltip.style.left = (elRect.left - outerRect.left + elRect.width/2) + 'px';
+  tooltip.style.top = (elRect.top - outerRect.top) + 'px';
+  tooltip.classList.add('show');
+}
+
+function hideWeightTooltip(){
+  const tooltip = document.getElementById('weightTooltip');
+  if(tooltip) tooltip.classList.remove('show');
+}
+
 function renderWeightChart(){
   const wrap = document.getElementById('weightChartWrap');
   const controlsWrap = document.getElementById('weightRangeControls');
   const fullSorted = [...weights].sort((a,b)=> a.date.localeCompare(b.date));
+  hideWeightTooltip();
 
   if(fullSorted.length < 2){
     wrap.innerHTML = `<div class="weight-chart-empty">Add at least two weigh-ins to see the growth chart.</div>`;
     if(controlsWrap) controlsWrap.style.display = 'none';
     return;
   }
-  if(controlsWrap) controlsWrap.style.display = 'flex';
+  if(controlsWrap) controlsWrap.style.display = 'block';
 
   const maxIdx = fullSorted.length - 1;
   if(!weightRangeCustom){
@@ -1104,6 +1174,7 @@ function renderWeightChart(){
   const toSlider = document.getElementById('weightRangeTo');
   fromSlider.min = 0; fromSlider.max = maxIdx; fromSlider.value = weightRangeFrom;
   toSlider.min = 0; toSlider.max = maxIdx; toSlider.value = weightRangeTo;
+  updateWeightSliderVisual();
 
   const sorted = fullSorted.slice(weightRangeFrom, weightRangeTo + 1);
   document.getElementById('weightRangeFromLabel').textContent =
@@ -1164,8 +1235,9 @@ function renderWeightChart(){
   const pts = sorted.map((w,i) => `${xScale(xs[i]).toFixed(1)},${yScale(ys[i]).toFixed(1)}`).join(' ');
   const circles = sorted.map((w,i) => {
     const cx = xScale(xs[i]).toFixed(1), cy = yScale(ys[i]).toFixed(1);
-    const title = `${new Date(w.date+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'})}: ${fmtWeightUnit(w.kg)}`;
-    return `<circle class="weight-pt" cx="${cx}" cy="${cy}" r="3"><title>${title}</title></circle>`;
+    const label = `${new Date(w.date+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'})}: ${fmtWeightUnit(w.kg)}`;
+    return `<circle class="weight-pt-hit" cx="${cx}" cy="${cy}" r="9" fill="transparent" data-label="${label}"/>
+            <circle class="weight-pt" cx="${cx}" cy="${cy}" r="3" data-label="${label}"/>`;
   }).join('');
 
   wrap.innerHTML = `
@@ -1408,6 +1480,22 @@ async function init(){
     weightRangeCustom = false;
     renderWeightChart();
   };
+  // whichever thumb is grabbed comes to the front, so overlapping thumbs stay independently draggable
+  const fromSliderEl = document.getElementById('weightRangeFrom');
+  const toSliderEl = document.getElementById('weightRangeTo');
+  ['pointerdown','touchstart'].forEach(evt => {
+    fromSliderEl.addEventListener(evt, () => { fromSliderEl.style.zIndex = 3; toSliderEl.style.zIndex = 2; });
+    toSliderEl.addEventListener(evt, () => { toSliderEl.style.zIndex = 3; fromSliderEl.style.zIndex = 2; });
+  });
+
+  document.getElementById('weightChartOuter').addEventListener('click', (ev) => {
+    const target = ev.target.closest('.weight-pt, .weight-pt-hit');
+    if(target){ showWeightTooltip(target); } else { hideWeightTooltip(); }
+  });
+  document.addEventListener('click', (ev) => {
+    const outer = document.getElementById('weightChartOuter');
+    if(outer && !outer.contains(ev.target)) hideWeightTooltip();
+  });
 
   document.getElementById('settingsBtn').onclick = () => document.getElementById('resetOverlay').classList.add('show');
   document.getElementById('resetCancel').onclick = () => document.getElementById('resetOverlay').classList.remove('show');
