@@ -213,6 +213,19 @@
 
   .weight-chart-empty{ text-align:center; padding:20px 10px; color:var(--ink-soft); font-size:13px; }
   .weight-svg{ width:100%; height:auto; display:block; }
+
+  .weight-range-controls{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:12px; margin-bottom:10px; }
+  .weight-range-field{ flex:1; min-width:110px; }
+  .weight-range-field label{ display:block; font-size:10px; color:var(--ink-soft); font-family:'JetBrains Mono',monospace; margin-bottom:2px; }
+  .weight-range-field input[type=range]{
+    width:100%; accent-color:var(--weight); height:20px; margin:0; cursor:pointer;
+  }
+  .weight-range-reset{
+    background:none; border:1px solid var(--line); border-radius:10px; padding:6px 10px;
+    font-family:'Inter',sans-serif; font-weight:600; font-size:11px; color:var(--ink-soft); cursor:pointer;
+    white-space:nowrap;
+  }
+  .weight-range-reset:active{ background:var(--cream); }
   .weight-pt{ fill:var(--weight); }
   .weight-line{ fill:none; stroke:var(--weight); stroke-width:2; stroke-linejoin:round; stroke-linecap:round; }
   .weight-axis-label{ font-family:'JetBrains Mono',monospace; font-size:8px; fill:var(--ink-soft); }
@@ -459,6 +472,17 @@
 
       <div class="trend-card">
         <h3>Weight growth over time</h3>
+        <div class="weight-range-controls" id="weightRangeControls">
+          <div class="weight-range-field">
+            <label>From <span id="weightRangeFromLabel"></span></label>
+            <input type="range" id="weightRangeFrom" min="0" max="0" value="0">
+          </div>
+          <div class="weight-range-field">
+            <label>To <span id="weightRangeToLabel"></span></label>
+            <input type="range" id="weightRangeTo" min="0" max="0" value="0">
+          </div>
+          <button class="weight-range-reset" id="weightRangeReset">Reset zoom</button>
+        </div>
         <div id="weightChartWrap"></div>
       </div>
 
@@ -549,6 +573,9 @@ let sleepStart = null;
 let notes = {};        // { 'YYYY-MM-DD': 'note text' }
 let weights = [];      // {id, date: 'YYYY-MM-DD', kg: number}
 let weightUnit = 'kg';
+let weightRangeFrom = 0;
+let weightRangeTo = null;
+let weightRangeCustom = false;
 let editingId = null;
 let editingWeightId = null;
 let sleepTickHandle = null;
@@ -667,8 +694,8 @@ function renderQuickStats(){
   }
 
   const { sleepFrac } = computeHeatmapData(dateKey(Date.now()));
-  const totalSleepToday = sleepFrac.reduce((a,b)=>a+b, 0);
-  document.getElementById('sleepToday').textContent = totalSleepToday.toFixed(1) + 'h';
+  const totalSleepTodayMs = sleepFrac.reduce((a,b)=>a+b, 0) * 3600000;
+  document.getElementById('sleepToday').textContent = totalSleepTodayMs > 0 ? fmtElapsed(totalSleepTodayMs) : '0m';
 }
 
 function entryRow(e){
@@ -976,12 +1003,37 @@ function renderTrends(){
   const avgPoopPerDay = dayData.reduce((s,d)=>s+d.poop,0) / 7;
   const avgSleepHrsPerDay = dayData.reduce((s,d)=>s+d.sleepHrs,0) / 7;
 
+  // average morning wake-up time: first sleep-end each day that falls between 4am and 8am
+  const wakeMinutesList = [];
+  days.forEach(k => {
+    const morningWakes = entries
+      .filter(e => e.type === 'sleep' && e.end && dateKey(e.end) === k)
+      .map(e => e.end)
+      .filter(endMs => {
+        const d = new Date(endMs);
+        const hh = d.getHours() + d.getMinutes()/60;
+        return hh >= 4 && hh < 8;
+      });
+    if(morningWakes.length){
+      const earliest = new Date(Math.min(...morningWakes));
+      wakeMinutesList.push(earliest.getHours()*60 + earliest.getMinutes());
+    }
+  });
+  let avgWakeLabel = '–';
+  if(wakeMinutesList.length){
+    const avgMinutes = wakeMinutesList.reduce((a,b)=>a+b,0) / wakeMinutesList.length;
+    const d = new Date();
+    d.setHours(Math.floor(avgMinutes/60), Math.round(avgMinutes%60), 0, 0);
+    avgWakeLabel = d.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+  }
+
   const statsEl = document.getElementById('trendStats');
   statsEl.innerHTML = `
     <div class="kv-row"><span class="k">Avg time between pees</span><span class="v">${avgGap ? fmtDuration(avgGap) : '–'}</span></div>
     <div class="kv-row"><span class="k">Avg pees per day</span><span class="v">${avgPeePerDay.toFixed(1)}</span></div>
     <div class="kv-row"><span class="k">Avg poops per day</span><span class="v">${avgPoopPerDay.toFixed(1)}</span></div>
     <div class="kv-row"><span class="k">Avg sleep, hrs per day</span><span class="v">${avgSleepHrsPerDay.toFixed(1)}</span></div>
+    <div class="kv-row"><span class="k">Avg morning wake-up</span><span class="v">${avgWakeLabel}</span></div>
   `;
 
   renderTrendHeatmap();
@@ -1028,12 +1080,43 @@ function renderWeightStats(){
 
 function renderWeightChart(){
   const wrap = document.getElementById('weightChartWrap');
-  const sorted = [...weights].sort((a,b)=> a.date.localeCompare(b.date));
-  if(sorted.length < 2){
+  const controlsWrap = document.getElementById('weightRangeControls');
+  const fullSorted = [...weights].sort((a,b)=> a.date.localeCompare(b.date));
+
+  if(fullSorted.length < 2){
     wrap.innerHTML = `<div class="weight-chart-empty">Add at least two weigh-ins to see the growth chart.</div>`;
+    if(controlsWrap) controlsWrap.style.display = 'none';
     return;
   }
-  const W = 320, H = 150, padL = 30, padR = 12, padT = 14, padB = 20;
+  if(controlsWrap) controlsWrap.style.display = 'flex';
+
+  const maxIdx = fullSorted.length - 1;
+  if(!weightRangeCustom){
+    weightRangeFrom = 0;
+    weightRangeTo = maxIdx;
+  } else {
+    weightRangeFrom = Math.min(Math.max(0, weightRangeFrom), maxIdx);
+    weightRangeTo = Math.min(weightRangeTo == null ? maxIdx : weightRangeTo, maxIdx);
+    if(weightRangeFrom > weightRangeTo) weightRangeTo = weightRangeFrom;
+  }
+
+  const fromSlider = document.getElementById('weightRangeFrom');
+  const toSlider = document.getElementById('weightRangeTo');
+  fromSlider.min = 0; fromSlider.max = maxIdx; fromSlider.value = weightRangeFrom;
+  toSlider.min = 0; toSlider.max = maxIdx; toSlider.value = weightRangeTo;
+
+  const sorted = fullSorted.slice(weightRangeFrom, weightRangeTo + 1);
+  document.getElementById('weightRangeFromLabel').textContent =
+    new Date(sorted[0].date+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'});
+  document.getElementById('weightRangeToLabel').textContent =
+    new Date(sorted[sorted.length-1].date+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'});
+
+  if(sorted.length < 2){
+    wrap.innerHTML = `<div class="weight-chart-empty">Select a wider range to see the growth chart.</div>`;
+    return;
+  }
+
+  const W = 320, H = 150, padL = 26, padR = 12, padT = 14, padB = 20;
   const xs = sorted.map(w => new Date(w.date+'T12:00:00').getTime());
   const ys = sorted.map(w => toDisplayWeight(w.kg));
   const minX = xs[0], maxX = xs[xs.length-1];
@@ -1043,6 +1126,41 @@ function renderWeightChart(){
   const xScale = x => maxX === minX ? padL + (W-padL-padR)/2 : padL + ((x-minX)/(maxX-minX)) * (W-padL-padR);
   const yScale = y => padT + (1 - (y-minY)/(maxY-minY)) * (H-padT-padB);
 
+  // horizontal gridlines: one per whole unit (kg or lb, whichever is displayed)
+  let hLines = '';
+  for(let v = Math.ceil(minY); v <= Math.floor(maxY); v++){
+    const y = yScale(v).toFixed(1);
+    hLines += `<line class="weight-grid-line" x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}"/>`;
+    hLines += `<text class="weight-axis-label" x="2" y="${(+y+3).toFixed(1)}">${v}</text>`;
+  }
+
+  // vertical gridlines: one at the start of each calendar month in range
+  const monthStarts = [];
+  let m = new Date(minX);
+  m.setHours(0,0,0,0); m.setDate(1);
+  if(m.getTime() < minX) m.setMonth(m.getMonth()+1);
+  while(m.getTime() <= maxX){
+    monthStarts.push(new Date(m));
+    m = new Date(m);
+    m.setMonth(m.getMonth()+1);
+  }
+  let vLines = '';
+  monthStarts.forEach(md => {
+    const x = xScale(md.getTime()).toFixed(1);
+    vLines += `<line class="weight-grid-line" x1="${x}" y1="${padT}" x2="${x}" y2="${H-padB}"/>`;
+    vLines += `<text class="weight-axis-label" x="${(+x-8).toFixed(1)}" y="${H-4}">${md.toLocaleDateString([], {month:'short'})}</text>`;
+  });
+
+  // fallback date labels when the range doesn't span a full calendar month
+  let fallbackLabels = '';
+  if(monthStarts.length === 0){
+    const firstLabel = new Date(sorted[0].date+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'});
+    const lastLabel = new Date(sorted[sorted.length-1].date+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'});
+    fallbackLabels = `
+      <text class="weight-axis-label" x="${padL}" y="${H-4}">${firstLabel}</text>
+      <text class="weight-axis-label" x="${W-padR-26}" y="${H-4}">${lastLabel}</text>`;
+  }
+
   const pts = sorted.map((w,i) => `${xScale(xs[i]).toFixed(1)},${yScale(ys[i]).toFixed(1)}`).join(' ');
   const circles = sorted.map((w,i) => {
     const cx = xScale(xs[i]).toFixed(1), cy = yScale(ys[i]).toFixed(1);
@@ -1050,17 +1168,11 @@ function renderWeightChart(){
     return `<circle class="weight-pt" cx="${cx}" cy="${cy}" r="3"><title>${title}</title></circle>`;
   }).join('');
 
-  const firstLabel = new Date(sorted[0].date+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'});
-  const lastLabel = new Date(sorted[sorted.length-1].date+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'});
-
   wrap.innerHTML = `
     <svg class="weight-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
-      <line class="weight-grid-line" x1="${padL}" y1="${padT}" x2="${W-padR}" y2="${padT}"/>
-      <line class="weight-grid-line" x1="${padL}" y1="${H-padB}" x2="${W-padR}" y2="${H-padB}"/>
-      <text class="weight-axis-label" x="2" y="${padT+3}">${maxY.toFixed(1)}</text>
-      <text class="weight-axis-label" x="2" y="${H-padB+3}">${minY.toFixed(1)}</text>
-      <text class="weight-axis-label" x="${padL}" y="${H-4}">${firstLabel}</text>
-      <text class="weight-axis-label" x="${W-padR-26}" y="${H-4}">${lastLabel}</text>
+      ${hLines}
+      ${vLines}
+      ${fallbackLabels}
       <polyline class="weight-line" points="${pts}"/>
       ${circles}
     </svg>`;
@@ -1276,6 +1388,26 @@ async function init(){
   document.getElementById('weightSave').onclick = saveWeightModal;
   document.getElementById('weightDelete').onclick = deleteWeightModal;
   document.getElementById('weightOverlay').onclick = (ev) => { if(ev.target.id==='weightOverlay') closeWeightModal(); };
+
+  const onWeightRangeChange = () => {
+    const fromSlider = document.getElementById('weightRangeFrom');
+    const toSlider = document.getElementById('weightRangeTo');
+    let from = parseInt(fromSlider.value, 10);
+    let to = parseInt(toSlider.value, 10);
+    if(from > to){
+      if(document.activeElement === fromSlider) to = from; else from = to;
+    }
+    weightRangeFrom = from;
+    weightRangeTo = to;
+    weightRangeCustom = true;
+    renderWeightChart();
+  };
+  document.getElementById('weightRangeFrom').addEventListener('input', onWeightRangeChange);
+  document.getElementById('weightRangeTo').addEventListener('input', onWeightRangeChange);
+  document.getElementById('weightRangeReset').onclick = () => {
+    weightRangeCustom = false;
+    renderWeightChart();
+  };
 
   document.getElementById('settingsBtn').onclick = () => document.getElementById('resetOverlay').classList.add('show');
   document.getElementById('resetCancel').onclick = () => document.getElementById('resetOverlay').classList.remove('show');
