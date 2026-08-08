@@ -274,6 +274,7 @@
   .bar-col{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; gap:4px; }
   .bar-stack{ width:100%; display:flex; flex-direction:column-reverse; align-items:stretch; justify-content:flex-start; height:100%; gap:2px; border-radius:6px; overflow:hidden; }
   .bar-seg{ width:100%; border-radius:2px; min-height:2px; }
+  .bar-value{ font-size:10px; font-family:'JetBrains Mono',monospace; color:var(--ink-soft); min-height:12px; }
   .bar-col .day-lbl{ font-size:10px; color:var(--ink-soft); margin-top:4px; font-family:'JetBrains Mono',monospace; }
   .legend{ display:flex; gap:14px; margin-top:12px; flex-wrap:wrap; }
   .legend-item{ display:flex; align-items:center; gap:5px; font-size:11px; color:var(--ink-soft); }
@@ -298,10 +299,10 @@
   .trend-toggle.active[data-type="sleep"]{ background:var(--sleep); border-color:var(--sleep); color:#fff; }
 
   .heatmap-week-wrap{ overflow-x:auto; margin-top:4px; }
-  .heatmap-week{ display:grid; grid-template-columns: 26px repeat(7, 1fr); gap:2px; min-width:280px; align-items:center; }
+  .heatmap-week{ display:grid; grid-template-columns: 20px repeat(28, 1fr); gap:1px; min-width:260px; align-items:center; }
   .hmw-day-label{ font-size:9px; color:var(--ink-soft); text-align:center; font-family:'JetBrains Mono',monospace; line-height:1.3; padding-bottom:4px; }
-  .hmw-hour-label{ font-size:8px; color:var(--ink-soft); text-align:right; padding-right:4px; font-family:'JetBrains Mono',monospace; line-height:1; }
-  .hmw-cell{ height:11px; border-radius:2px; background:var(--cream); border:1px solid var(--line); }
+  .hmw-hour-label{ height:4px; line-height:4px; overflow:visible; font-size:9px; color:var(--ink-soft); text-align:right; padding-right:4px; font-family:'JetBrains Mono',monospace; }
+  .hmw-cell{ aspect-ratio:1/1; border-radius:1px; background:var(--cream); border:1px solid var(--line); }
 
   /* ---------- Tab bar ---------- */
   nav.tabbar{
@@ -454,12 +455,31 @@
       </div>
 
       <div class="trend-card">
-        <h3>Weekly heat map</h3>
-        <div class="trend-toggle-row" id="trendActivityToggle">
-          <button class="trend-toggle" data-type="eat">Eat</button>
+        <h3>7-day totals</h3>
+        <div class="trend-toggle-row" id="dailyChartToggle">
           <button class="trend-toggle" data-type="pee">Pee</button>
           <button class="trend-toggle" data-type="poop">Poop</button>
           <button class="trend-toggle" data-type="sleep">Sleep</button>
+        </div>
+        <div class="hist-nav">
+          <button class="hist-nav-btn" id="dailyChartPrevWeek" aria-label="Previous 7 days">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="hist-nav-label" id="dailyChartWeekLabel"></div>
+          <button class="hist-nav-btn" id="dailyChartNextWeek" aria-label="Next 7 days">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+        <div id="dailyChartBars"></div>
+      </div>
+
+      <div class="trend-card">
+        <h3>Weekly heat map</h3>
+        <div class="heatmap-legend" style="margin:0 0 12px;">
+          <span class="legend-dot" style="background:var(--eat)"></span>Eat
+          <span class="legend-dot" style="background:var(--pee); margin-left:8px;"></span>Pee
+          <span class="legend-dot" style="background:var(--poop); margin-left:8px;"></span>Poop
+          <span class="legend-dot" style="background:var(--sleep); margin-left:8px;"></span>Sleep
         </div>
         <div class="hist-nav">
           <button class="hist-nav-btn" id="trendPrevWeek" aria-label="Previous 7 days">
@@ -759,15 +779,17 @@ function getDayBounds(key){
   return [start, start + 86400000];
 }
 
-function accumulateSleepHours(start, end, dayStart, dayEnd, arr){
+function accumulateSleepHours(start, end, dayStart, dayEnd, arr, bucketMs){
+  bucketMs = bucketMs || 3600000;
+  const cap = bucketMs / 3600000;
   const s = Math.max(start, dayStart);
   const en = Math.min(end == null ? Date.now() : end, dayEnd);
   if(en <= s) return;
-  for(let h=0; h<24; h++){
-    const hourStart = dayStart + h*3600000;
-    const hourEnd = hourStart + 3600000;
-    const overlap = Math.min(en, hourEnd) - Math.max(s, hourStart);
-    if(overlap > 0) arr[h] = Math.min(1, arr[h] + overlap/3600000);
+  for(let i=0; i<arr.length; i++){
+    const bStart = dayStart + i*bucketMs;
+    const bEnd = bStart + bucketMs;
+    const overlap = Math.min(en, bEnd) - Math.max(s, bStart);
+    if(overlap > 0) arr[i] = Math.min(cap, arr[i] + overlap/3600000);
   }
 }
 
@@ -777,20 +799,45 @@ function computeHeatmapData(key){
   const sleepFrac = new Array(24).fill(0);
   entries.forEach(e => {
     if(e.type === 'sleep'){
-      accumulateSleepHours(e.start, e.end, dayStart, dayEnd, sleepFrac);
+      accumulateSleepHours(e.start, e.end, dayStart, dayEnd, sleepFrac, 3600000);
     } else if(dateKey(e.start) === key){
       const h = new Date(e.start).getHours();
       counts[e.type][h] += 1;
     }
   });
-  if(sleepStart) accumulateSleepHours(sleepStart, null, dayStart, dayEnd, sleepFrac);
+  if(sleepStart) accumulateSleepHours(sleepStart, null, dayStart, dayEnd, sleepFrac, 3600000);
   return { counts, sleepFrac };
 }
 
-function heatCellStyle(type, val){
+// 15-minute-resolution variant, used by the weekly heat map only
+const QUARTER_MS = 900000;
+function computeHeatmapData15(key){
+  const [dayStart, dayEnd] = getDayBounds(key);
+  const counts = { eat:new Array(96).fill(0), pee:new Array(96).fill(0), poop:new Array(96).fill(0) };
+  const sleepFrac = new Array(96).fill(0);
+  entries.forEach(e => {
+    if(e.type === 'sleep'){
+      accumulateSleepHours(e.start, e.end, dayStart, dayEnd, sleepFrac, QUARTER_MS);
+    } else if(dateKey(e.start) === key){
+      const d = new Date(e.start);
+      const slot = Math.floor((d.getHours()*60 + d.getMinutes()) / 15);
+      counts[e.type][slot] += 1;
+    }
+  });
+  if(sleepStart) accumulateSleepHours(sleepStart, null, dayStart, dayEnd, sleepFrac, QUARTER_MS);
+  return { counts, sleepFrac };
+}
+
+function heatCellStyle(type, val, maxSleepVal){
   if(!val) return `background:var(--cream);`;
   const rgb = HM_RGB[type];
-  const alpha = type === 'sleep' ? Math.min(1, 0.25 + val*0.75) : Math.min(1, 0.35 + val*0.3);
+  let alpha;
+  if(type === 'sleep'){
+    const norm = maxSleepVal ? Math.min(1, val/maxSleepVal) : Math.min(1, val);
+    alpha = Math.min(1, 0.25 + norm*0.75);
+  } else {
+    alpha = Math.min(1, 0.35 + val*0.3);
+  }
   return `background:rgba(${rgb},${alpha}); border-color:transparent;`;
 }
 
@@ -962,7 +1009,6 @@ function renderHistory(){
   container.appendChild(tl);
 }
 
-let trendActivity = 'pee';
 let trendWeekEndKey = dateKey(Date.now());
 
 function get7DayWindow(endKey){
@@ -986,16 +1032,7 @@ function shiftTrendWeek(deltaWeeks){
   renderTrendHeatmap();
 }
 
-function setTrendActivity(type){
-  trendActivity = type;
-  renderTrendHeatmap();
-}
-
 function renderTrendHeatmap(){
-  document.querySelectorAll('.trend-toggle').forEach(b => {
-    b.classList.toggle('active', b.dataset.type === trendActivity);
-  });
-
   const days = get7DayWindow(trendWeekEndKey);
   const todayKey = dateKey(Date.now());
   document.getElementById('trendNextWeek').classList.toggle('disabled', trendWeekEndKey === todayKey);
@@ -1004,28 +1041,109 @@ function renderTrendHeatmap(){
   const endLabel = new Date(days[6]+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'});
   document.getElementById('trendWeekLabel').textContent = `${startLabel} – ${endLabel}`;
 
-  const dayValues = days.map(k => {
-    const { counts, sleepFrac } = computeHeatmapData(k);
-    return trendActivity === 'sleep' ? sleepFrac : counts[trendActivity];
-  });
+  // one computeHeatmapData15 call per day, reused across all 4 activity sub-columns
+  const dayData = days.map(k => computeHeatmapData15(k));
 
   let html = '<div class="hmw-hour-label"></div>';
   days.forEach(k => {
     const d = new Date(k+'T12:00:00');
-    html += `<div class="hmw-day-label">${d.toLocaleDateString([], {weekday:'narrow'})}<br>${d.getDate()}</div>`;
+    html += `<div class="hmw-day-label" style="grid-column: span 4;">${d.toLocaleDateString([], {weekday:'narrow'})}<br>${d.getDate()}</div>`;
   });
-  const label = LABELS[trendActivity].toLowerCase();
-  for(let h=0; h<24; h++){
-    html += `<div class="hmw-hour-label">${h % 3 === 0 ? h : ''}</div>`;
-    dayValues.forEach(valsArr => {
-      const val = valsArr[h];
-      const title = trendActivity === 'sleep'
-        ? (val ? Math.round(val*60)+'m asleep' : '')
-        : (val ? val + ' ' + label + (val===1?'':'s') : '');
-      html += `<div class="hmw-cell" title="${title}" style="${heatCellStyle(trendActivity, val)}"></div>`;
+  for(let slot=0; slot<96; slot++){
+    const hour = Math.floor(slot/4);
+    const minute = (slot%4)*15;
+    const showLabel = minute === 0 && hour % 3 === 0;
+    const hourStart = minute === 0 && slot > 0;
+    html += `<div class="hmw-hour-label" style="${hourStart ? 'border-top:1px solid rgba(58,85,65,0.35);' : ''}">${showLabel ? hour : ''}</div>`;
+    dayData.forEach(({counts, sleepFrac}, dayIdx) => {
+      HM_ROWS.forEach(([type, typeLabel], actIdx) => {
+        const val = type === 'sleep' ? sleepFrac[slot] : counts[type][slot];
+        const title = type === 'sleep'
+          ? (val ? Math.round(val*60)+'m asleep' : '')
+          : (val ? val + ' ' + typeLabel.toLowerCase() + (val===1?'':'s') : '');
+        const groupBorder = (actIdx === 0 && dayIdx > 0) ? 'border-left:2px solid var(--ink-soft);' : '';
+        const hourBorder = hourStart ? 'border-top:1px solid rgba(58,85,65,0.35);' : '';
+        html += `<div class="hmw-cell" title="${title}" style="${heatCellStyle(type, val, 0.25)}${groupBorder}${hourBorder}"></div>`;
+      });
     });
   }
   document.getElementById('trendHeatmap').innerHTML = html;
+}
+
+// ---------- 7-day totals bar chart ----------
+let dailyChartActivity = 'pee';
+let dailyChartWeekEndKey = dateKey(Date.now());
+
+function shiftDailyChartWeek(deltaWeeks){
+  const todayKey = dateKey(Date.now());
+  const d = new Date(dailyChartWeekEndKey + 'T12:00:00');
+  d.setDate(d.getDate() + deltaWeeks*7);
+  const newKey = dateKey(d.getTime());
+  if(newKey > todayKey) return;
+  dailyChartWeekEndKey = newKey;
+  renderDailyChart();
+}
+
+function setDailyChartActivity(type){
+  dailyChartActivity = type;
+  renderDailyChart();
+}
+
+function renderDailyChart(){
+  document.querySelectorAll('#dailyChartToggle .trend-toggle').forEach(b => {
+    b.classList.toggle('active', b.dataset.type === dailyChartActivity);
+  });
+
+  const days = get7DayWindow(dailyChartWeekEndKey);
+  const todayKey = dateKey(Date.now());
+  document.getElementById('dailyChartNextWeek').classList.toggle('disabled', dailyChartWeekEndKey === todayKey);
+
+  const startLabel = new Date(days[0]+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'});
+  const endLabel = new Date(days[6]+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'});
+  document.getElementById('dailyChartWeekLabel').textContent = `${startLabel} – ${endLabel}`;
+
+  const values = days.map(k => {
+    if(dailyChartActivity === 'sleep') return computeHeatmapData(k).sleepFrac.reduce((a,b)=>a+b, 0);
+    return entries.filter(e => e.type === dailyChartActivity && dateKey(e.start) === k).length;
+  });
+
+  const W = 320, H = 140, padL = 26, padR = 12, padT = 14, padB = 20;
+  const maxValRaw = Math.max(0, ...values);
+  const maxVal = Math.max(1, maxValRaw + Math.max(0.5, maxValRaw*0.15));
+  const xScale = i => padL + i * ((W-padL-padR)/6);
+  const yScale = v => padT + (1 - v/maxVal) * (H-padT-padB);
+
+  // horizontal gridlines, one per whole unit, thinned out if the range is large
+  const step = Math.max(1, Math.ceil(Math.floor(maxVal)/6));
+  let hLines = '';
+  for(let v=0; v<=Math.floor(maxVal); v += step){
+    const y = yScale(v).toFixed(1);
+    hLines += `<line class="weight-grid-line" x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}"/>`;
+    hLines += `<text class="weight-axis-label" x="2" y="${(+y+3).toFixed(1)}">${v}</text>`;
+  }
+
+  const pts = values.map((v,i) => `${xScale(i).toFixed(1)},${yScale(v).toFixed(1)}`).join(' ');
+  const color = `var(--${dailyChartActivity})`;
+  const circles = values.map((v,i) => {
+    const cx = xScale(i).toFixed(1), cy = yScale(v).toFixed(1);
+    const dayLbl = new Date(days[i]+'T12:00:00').toLocaleDateString([], {weekday:'short', month:'short', day:'numeric'});
+    const valLabel = dailyChartActivity === 'sleep' ? v.toFixed(1)+'h' : v;
+    return `<circle cx="${cx}" cy="${cy}" r="3" fill="${color}"><title>${dayLbl}: ${valLabel}</title></circle>`;
+  }).join('');
+
+  const dayLabels = days.map((k,i) => {
+    const x = xScale(i).toFixed(1);
+    const lbl = new Date(k+'T12:00:00').toLocaleDateString([], {weekday:'short'});
+    return `<text class="weight-axis-label" x="${(+x-8).toFixed(1)}" y="${H-4}">${lbl}</text>`;
+  }).join('');
+
+  document.getElementById('dailyChartBars').innerHTML = `
+    <svg class="weight-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+      ${hLines}
+      ${dayLabels}
+      <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      ${circles}
+    </svg>`;
 }
 
 function renderTrends(){
@@ -1108,6 +1226,7 @@ function renderTrends(){
     <div class="kv-row"><span class="k">Avg morning wake-up</span><span class="v">${avgWakeLabel}</span></div>
   `;
 
+  renderDailyChart();
   renderTrendHeatmap();
 }
 
@@ -1482,9 +1601,12 @@ async function init(){
 
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
 
-  document.querySelectorAll('.trend-toggle').forEach(b => b.onclick = () => setTrendActivity(b.dataset.type));
   document.getElementById('trendPrevWeek').onclick = () => shiftTrendWeek(-1);
   document.getElementById('trendNextWeek').onclick = () => shiftTrendWeek(1);
+
+  document.querySelectorAll('#dailyChartToggle .trend-toggle').forEach(b => b.onclick = () => setDailyChartActivity(b.dataset.type));
+  document.getElementById('dailyChartPrevWeek').onclick = () => shiftDailyChartWeek(-1);
+  document.getElementById('dailyChartNextWeek').onclick = () => shiftDailyChartWeek(1);
 
   document.getElementById('editCancel').onclick = closeEdit;
   document.getElementById('editSave').onclick = saveEdit;
