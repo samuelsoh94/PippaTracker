@@ -72,6 +72,7 @@
   .stats{
     display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px;
   }
+  .stats-3{ grid-template-columns:1fr 1fr 1fr; }
   .stat{
     background:var(--card); border:1px solid var(--line);
     border-radius:14px; padding:10px 12px; box-shadow:var(--shadow);
@@ -402,7 +403,11 @@
 
     <!-- LOG TAB -->
     <div class="tab-panel active" id="panel-log">
-      <div class="stats">
+      <div class="section-title">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3A5541" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Today
+      </div>
+      <div class="stats stats-3">
         <div class="stat">
           <div class="label"><span class="dot" style="background:var(--pee)"></span>Since pee</div>
           <div class="value" id="sincePee">–</div>
@@ -414,10 +419,6 @@
         <div class="stat">
           <div class="label"><span class="dot" style="background:var(--sleep)"></span>Since sleep</div>
           <div class="value" id="sinceSleep">–</div>
-        </div>
-        <div class="stat">
-          <div class="label"><span class="dot" style="background:var(--sleep)"></span>Sleep today</div>
-          <div class="value" id="sleepToday">–</div>
         </div>
       </div>
       <div class="log-grid">
@@ -727,10 +728,6 @@ function renderQuickStats(){
   } else {
     sinceSleepEl.textContent = '–';
   }
-
-  const { sleepFrac } = computeHeatmapData(dateKey(Date.now()));
-  const totalSleepTodayMs = sleepFrac.reduce((a,b)=>a+b, 0) * 3600000;
-  document.getElementById('sleepToday').textContent = totalSleepTodayMs > 0 ? fmtElapsed(totalSleepTodayMs) : '0m';
 }
 
 function entryRow(e){
@@ -910,6 +907,32 @@ function renderHistory(){
     </button>
   `;
   container.appendChild(nav);
+  document.getElementById('histPrev').onclick = () => shiftHistoryDay(-1);
+  document.getElementById('histNext').onclick = () => shiftHistoryDay(1);
+
+  const dayEntries = entries.filter(e => dateKey(e.start) === selectedHistoryDate).sort((a,b)=>b.start-a.start);
+  const dayPeeCount = dayEntries.filter(e => e.type === 'pee').length;
+  const dayPoopCount = dayEntries.filter(e => e.type === 'poop').length;
+  const daySleepHrsMs = computeHeatmapData(selectedHistoryDate).sleepFrac.reduce((a,b)=>a+b, 0) * 3600000;
+
+  const dayStats = document.createElement('div');
+  dayStats.className = 'stats stats-3';
+  dayStats.style.marginBottom = '16px';
+  dayStats.innerHTML = `
+    <div class="stat">
+      <div class="label"><span class="dot" style="background:var(--pee)"></span>Pees</div>
+      <div class="value">${dayPeeCount}</div>
+    </div>
+    <div class="stat">
+      <div class="label"><span class="dot" style="background:var(--poop)"></span>Poops</div>
+      <div class="value">${dayPoopCount}</div>
+    </div>
+    <div class="stat">
+      <div class="label"><span class="dot" style="background:var(--sleep)"></span>Sleep</div>
+      <div class="value">${daySleepHrsMs > 0 ? fmtElapsed(daySleepHrsMs) : '0m'}</div>
+    </div>
+  `;
+  container.appendChild(dayStats);
 
   const hmCard = document.createElement('div');
   hmCard.className = 'heatmap-card';
@@ -917,14 +940,10 @@ function renderHistory(){
     <div class="heatmap-legend">Darker = more activity that hour · tap a day to see details below</div>`;
   container.appendChild(hmCard);
 
-  document.getElementById('histPrev').onclick = () => shiftHistoryDay(-1);
-  document.getElementById('histNext').onclick = () => shiftHistoryDay(1);
-
   const notesWrap = document.createElement('div');
   container.appendChild(notesWrap);
   renderNotesInto(notesWrap, selectedHistoryDate);
 
-  const dayEntries = entries.filter(e => dateKey(e.start) === selectedHistoryDate).sort((a,b)=>b.start-a.start);
   const listTitle = document.createElement('div');
   listTitle.className = 'section-title';
   listTitle.textContent = dayEntries.length ? `${fmtDateHeader(selectedHistoryDate)}'s entries` : '';
@@ -1021,17 +1040,35 @@ function renderTrends(){
     const dayEntries = entries.filter(e => dateKey(e.start) === k);
     const pee = dayEntries.filter(e=>e.type==='pee').length;
     const poop = dayEntries.filter(e=>e.type==='poop').length;
-    const sleepHrs = dayEntries.filter(e=>e.type==='sleep' && e.end).reduce((s,e)=> s + (e.end-e.start), 0) / 3600000;
+    const sleepHrs = computeHeatmapData(k).sleepFrac.reduce((a,b)=>a+b, 0);
     return {k, pee, poop, sleepHrs};
   });
 
-  // average gap between pees, using only pees from the last 7 days
+  // average gap between pees, using only pees from the last 7 days, excluding overnight sleep hours (00:00-05:00)
+  function nightExclusionMs(startMs, endMs){
+    let total = 0;
+    const cursor = new Date(startMs);
+    cursor.setHours(0,0,0,0);
+    while(cursor.getTime() < endMs){
+      const nightStart = cursor.getTime();
+      const nightEnd = nightStart + 5*3600000; // 00:00–05:00
+      const overlapStart = Math.max(startMs, nightStart);
+      const overlapEnd = Math.min(endMs, nightEnd);
+      if(overlapEnd > overlapStart) total += (overlapEnd - overlapStart);
+      cursor.setDate(cursor.getDate()+1);
+    }
+    return total;
+  }
   const rangeStart = getDayBounds(days[0])[0];
   const pees = entries.filter(e => e.type==='pee' && e.start >= rangeStart).sort((a,b)=>a.start-b.start);
   let avgGap = null;
   if(pees.length >= 2){
     const gaps = [];
-    for(let i=1;i<pees.length;i++) gaps.push(pees[i].start - pees[i-1].start);
+    for(let i=1;i<pees.length;i++){
+      const rawGap = pees[i].start - pees[i-1].start;
+      const adjustedGap = Math.max(0, rawGap - nightExclusionMs(pees[i-1].start, pees[i].start));
+      gaps.push(adjustedGap);
+    }
     avgGap = gaps.reduce((a,b)=>a+b,0)/gaps.length;
   }
   const avgPeePerDay = dayData.reduce((s,d)=>s+d.pee,0) / 7;
