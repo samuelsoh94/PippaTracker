@@ -634,6 +634,7 @@ let weightRangeCustom = false;
 let editingId = null;
 let editingWeightId = null;
 let sleepTickHandle = null;
+let dataLoaded = false;
 
 const ICONS = {
   pee: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2.5c3 4 6 7.7 6 11.3a6 6 0 1 1-12 0c0-3.6 3-7.3 6-11.3Z"/></svg>',
@@ -660,21 +661,36 @@ async function loadData(){
     notes = json.notes || {};
     weights = json.weights || [];
     weightUnit = json.weightUnit || 'kg';
+    dataLoaded = true;
   }catch(e){
-    console.log('No existing data yet, or failed to load from the sheet.', e);
+    console.log('Failed to load from the sheet — refusing future saves until a reload succeeds.', e);
     entries = []; sleepStart = null; notes = {}; weights = []; weightUnit = 'kg';
+    dataLoaded = false;
     showConnError();
   }
 }
 
-async function saveData(){
+async function saveData(opts){
+  opts = opts || {};
+  if(!dataLoaded){
+    // Refuse to overwrite the sheet with possibly-incomplete local data —
+    // this is what previously allowed a failed load to wipe real data.
+    console.error('Refusing to save: initial data load never completed successfully.');
+    showConnError();
+    return;
+  }
   try{
     const res = await fetch(SHEET_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight to Apps Script
-      body: JSON.stringify({entries, sleepStart, notes, weights, weightUnit})
+      body: JSON.stringify({entries, sleepStart, notes, weights, weightUnit, allowWipe: !!opts.allowWipe})
     });
     if(!res.ok) throw new Error('Sheet save failed: ' + res.status);
+    const json = await res.json().catch(() => null);
+    if(json && json.ok === false){
+      console.error('Save refused by the sheet backend:', json.error);
+      showConnError();
+    }
   }catch(e){
     console.error('Failed to save to the sheet', e);
     showConnError();
@@ -1664,7 +1680,7 @@ async function init(){
   document.getElementById('resetCancel2').onclick = () => document.getElementById('resetOverlay2').classList.remove('show');
   document.getElementById('resetConfirm2').onclick = async () => {
     entries = []; sleepStart = null;
-    await saveData();
+    await saveData({allowWipe: true});
     document.getElementById('resetOverlay2').classList.remove('show');
     render();
   };
