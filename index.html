@@ -623,7 +623,6 @@
 
 <script>
 const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbymTAseFKjyBi-ZLOdJD_Qfwdz9YnBSCi8_roS5kf_vuPZODHdCOfz8Mb2-CpKP7Qo4Eg/exec';
-const STORAGE_KEY = 'pippa-log-data';
 let entries = [];      // {id, type: 'pee'|'poop'|'sleep', start: ms, end: ms|null}
 let sleepStart = null;
 let notes = {};        // { 'YYYY-MM-DD': 'note text' }
@@ -653,17 +652,14 @@ function showConnError(){
 
 async function loadData(){
   try{
-    const res = await fetch(`${SHEET_API_URL}?key=${encodeURIComponent(STORAGE_KEY)}`);
+    const res = await fetch(SHEET_API_URL);
     if(!res.ok) throw new Error('Sheet request failed: ' + res.status);
     const json = await res.json();
-    if(json && json.value){
-      const parsed = JSON.parse(json.value);
-      entries = parsed.entries || [];
-      sleepStart = parsed.sleepStart || null;
-      notes = parsed.notes || {};
-      weights = parsed.weights || [];
-      weightUnit = parsed.weightUnit || 'kg';
-    }
+    entries = json.entries || [];
+    sleepStart = json.sleepStart || null;
+    notes = json.notes || {};
+    weights = json.weights || [];
+    weightUnit = json.weightUnit || 'kg';
   }catch(e){
     console.log('No existing data yet, or failed to load from the sheet.', e);
     entries = []; sleepStart = null; notes = {}; weights = []; weightUnit = 'kg';
@@ -673,11 +669,10 @@ async function loadData(){
 
 async function saveData(){
   try{
-    const value = JSON.stringify({entries, sleepStart, notes, weights, weightUnit});
     const res = await fetch(SHEET_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight to Apps Script
-      body: JSON.stringify({ key: STORAGE_KEY, value })
+      body: JSON.stringify({entries, sleepStart, notes, weights, weightUnit})
     });
     if(!res.ok) throw new Error('Sheet save failed: ' + res.status);
   }catch(e){
