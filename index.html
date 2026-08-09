@@ -217,6 +217,12 @@
   .weight-svg{ width:100%; height:auto; display:block; }
 
   .weight-chart-outer{ position:relative; }
+  .weight-delta-card{
+    position:absolute; top:2px; right:2px; background:var(--weight-bg); border:1px solid var(--weight);
+    border-radius:10px; padding:5px 9px; font-family:'JetBrains Mono',monospace; font-size:12px;
+    font-weight:600; color:var(--weight); z-index:3; white-space:nowrap; box-shadow:var(--shadow);
+  }
+  .weight-delta-card .pct{ font-weight:500; opacity:.85; }
   .weight-tooltip{
     position:absolute; transform:translate(-50%,-130%); background:var(--ink); color:#fff;
     font-family:'JetBrains Mono',monospace; font-size:11px; padding:5px 9px; border-radius:8px;
@@ -315,12 +321,18 @@
   }
   .tabbar-inner{ max-width:520px; width:100%; display:flex; }
   .tab{
-    flex:1; background:none; border:none; display:flex; flex-direction:column; align-items:center; gap:3px;
+    flex:1; background:none; border:none; display:flex; flex-direction:column; align-items:center; gap:2px;
     padding:4px 0; color:var(--ink-soft); font-size:11px; font-family:'Inter',sans-serif; font-weight:500;
-    cursor:pointer;
+    cursor:pointer; transition:color .15s ease;
+  }
+  .tab-icon{
+    display:flex; align-items:center; justify-content:center; width:38px; height:26px; border-radius:14px;
+    transition:background .15s ease, transform .1s ease;
   }
   .tab svg{ width:21px; height:21px; }
-  .tab.active{ color:var(--forest); }
+  .tab.active{ color:var(--forest); font-weight:700; }
+  .tab.active .tab-icon{ background:rgba(58,85,65,0.14); }
+  .tab:active .tab-icon{ transform:scale(0.86); background:rgba(58,85,65,0.14); }
 
   .tab-panel{ display:none; }
   .tab-panel.active{ display:block; }
@@ -346,8 +358,9 @@
   .modal-actions{ display:flex; gap:10px; }
   .modal-actions button{
     flex:1; padding:12px; border-radius:12px; border:none; font-weight:600; font-size:14px; cursor:pointer;
-    font-family:'Inter',sans-serif;
+    font-family:'Inter',sans-serif; transition:transform .1s ease, filter .1s ease;
   }
+  .modal-actions button:active{ transform:scale(0.95); filter:brightness(0.9); }
   .btn-save{ background:var(--forest); color:#fff; }
   .btn-delete{ background:var(--poop-bg); color:var(--poop); }
   .btn-cancel{ background:var(--line); color:var(--ink); }
@@ -533,6 +546,7 @@
         <h3>Weight growth over time</h3>
         <div class="weight-chart-outer" id="weightChartOuter">
           <div id="weightChartWrap"></div>
+          <div class="weight-delta-card" id="weightDeltaCard" style="display:none"></div>
           <div class="weight-tooltip" id="weightTooltip"></div>
         </div>
         <div class="weight-range-controls" id="weightRangeControls">
@@ -563,15 +577,15 @@
   <nav class="tabbar">
     <div class="tabbar-inner">
       <button class="tab active" data-tab="log">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h16M4 6h16M4 18h10"/></svg>
+        <span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h16M4 6h16M4 18h10"/></svg></span>
         Log
       </button>
       <button class="tab" data-tab="weight">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 15.5c1 .8 2.2 1.2 3.5 1.2s2.5-.4 3.5-1.2M9 9.5c.3-.6.9-1 1.5-1M13.5 9.5c.3-.6.9-1 1.5-1"/></svg>
+        <span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 15.5c1 .8 2.2 1.2 3.5 1.2s2.5-.4 3.5-1.2M9 9.5c.3-.6.9-1 1.5-1M13.5 9.5c.3-.6.9-1 1.5-1"/></svg></span>
         Weight
       </button>
       <button class="tab" data-tab="trends">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M11 20V4M18 20v-7"/></svg>
+        <span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M11 20V4M18 20v-7"/></svg></span>
         Trends
       </button>
     </div>
@@ -1333,6 +1347,7 @@ function renderWeightChart(){
   if(fullSorted.length < 2){
     wrap.innerHTML = `<div class="weight-chart-empty">Add at least two weigh-ins to see the growth chart.</div>`;
     if(controlsWrap) controlsWrap.style.display = 'none';
+    document.getElementById('weightDeltaCard').style.display = 'none';
     return;
   }
   if(controlsWrap) controlsWrap.style.display = 'block';
@@ -1361,8 +1376,20 @@ function renderWeightChart(){
 
   if(sorted.length < 2){
     wrap.innerHTML = `<div class="weight-chart-empty">Select a wider range to see the growth chart.</div>`;
+    document.getElementById('weightDeltaCard').style.display = 'none';
     return;
   }
+
+  // weight change across the currently visible range (respects the slider)
+  const firstKg = sorted[0].kg, lastKg = sorted[sorted.length-1].kg;
+  const deltaKg = lastKg - firstKg;
+  const deltaDisplay = toDisplayWeight(Math.abs(deltaKg)).toFixed(1);
+  const sign = deltaKg > 0 ? '+' : (deltaKg < 0 ? '−' : '');
+  const pct = firstKg !== 0 ? (deltaKg/firstKg)*100 : null;
+  const pctText = pct !== null ? `${pct>=0?'+':''}${pct.toFixed(0)}%` : '–';
+  const deltaCard = document.getElementById('weightDeltaCard');
+  deltaCard.style.display = 'block';
+  deltaCard.innerHTML = `${sign}${deltaDisplay} ${weightUnit} <span class="pct">(${pctText})</span>`;
 
   const W = 320, H = 150, padL = 26, padR = 12, padT = 14, padB = 20;
   const xs = sorted.map(w => new Date(w.date+'T12:00:00').getTime());
