@@ -24,6 +24,8 @@
     --sleep-bg:#EDEAE2;
     --eat:#6E8C4E;
     --eat-bg:#E7EED9;
+    --walk:#3E8F8F;
+    --walk-bg:#DDEDED;
     --weight:#6B5B95;
     --weight-bg:#E7E3F0;
     --forest:#3A5541;
@@ -33,6 +35,9 @@
     color-scheme: light;
   }
   *{box-sizing:border-box;}
+  button, .entry, .weight-pt-hit, .tab, .log-btn, .hist-nav-btn, .unit-btn, .trend-toggle{
+    touch-action: manipulation;
+  }
   html,body{
     margin:0; padding:0; height:100%;
     background:var(--cream);
@@ -74,6 +79,10 @@
     display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:18px;
   }
   .stats-3{ grid-template-columns:1fr 1fr 1fr; }
+  .stats-4{ grid-template-columns:1fr 1fr 1fr 1fr; gap:6px; }
+  .stats-4 .stat{ padding:8px 6px; }
+  .stats-4 .stat .label{ font-size:9.5px; gap:3px; }
+  .stats-4 .stat .value{ font-size:14px; }
   .stat{
     background:var(--card); border:1px solid var(--line);
     border-radius:14px; padding:10px 12px; box-shadow:var(--shadow);
@@ -85,7 +94,8 @@
   main{ flex:1; padding: 0 16px 90px; overflow-y:auto; }
 
   /* ---------- Log tab: big buttons ---------- */
-  .log-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:22px; }
+  .log-grid-instant{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px; }
+  .log-grid-toggle{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:22px; }
   .log-btn{
     background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
     padding:16px 6px 12px; display:flex; flex-direction:column; align-items:center; gap:8px;
@@ -98,14 +108,23 @@
     width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center;
   }
   .log-btn .circle svg{ width:24px; height:24px; }
+  .log-btn.toggle-btn{ padding:20px 6px 16px; font-size:15px; }
+  .log-btn.toggle-btn .circle{ width:56px; height:56px; }
+  .log-btn.toggle-btn .circle svg{ width:28px; height:28px; }
   .log-btn.pee .circle{ background:var(--pee-bg); color:var(--pee); }
   .log-btn.poop .circle{ background:var(--poop-bg); color:var(--poop); }
   .log-btn.sleep .circle{ background:var(--sleep-bg); color:var(--sleep); }
   .log-btn.eat .circle{ background:var(--eat-bg); color:var(--eat); }
-  .log-btn.sleep.active .circle{ background:var(--sleep); color:#fff; animation:pulse 1.8s infinite; }
+  .log-btn.walk .circle{ background:var(--walk-bg); color:var(--walk); }
+  .log-btn.sleep.active .circle{ background:var(--sleep); color:#fff; animation:pulse-sleep 1.8s infinite; }
   .log-btn.sleep.active{ border-color:var(--sleep); }
-  @keyframes pulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(79,112,140,0.35);} 50%{ box-shadow:0 0 0 8px rgba(79,112,140,0);} }
-  .sleep-timer{ font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--sleep); }
+  .log-btn.walk.active .circle{ background:var(--walk); color:#fff; animation:pulse-walk 1.8s infinite; }
+  .log-btn.walk.active{ border-color:var(--walk); }
+  @keyframes pulse-sleep{ 0%,100%{ box-shadow:0 0 0 0 rgba(155,150,137,0.35);} 50%{ box-shadow:0 0 0 8px rgba(155,150,137,0);} }
+  @keyframes pulse-walk{ 0%,100%{ box-shadow:0 0 0 0 rgba(62,143,143,0.35);} 50%{ box-shadow:0 0 0 8px rgba(62,143,143,0);} }
+  .sleep-timer{ font-family:'JetBrains Mono', monospace; font-size:11px; }
+  #sleepTimer{ color:var(--sleep); }
+  #walkTimer{ color:var(--walk); }
 
   .just-logged{
     text-align:center; font-size:12px; color:var(--forest); font-weight:500;
@@ -135,6 +154,7 @@
   .entry.poop .icon-circle{ background:var(--poop-bg); color:var(--poop); }
   .entry.sleep .icon-circle{ background:var(--sleep-bg); color:var(--sleep); }
   .entry.eat .icon-circle{ background:var(--eat-bg); color:var(--eat); }
+  .entry.walk .icon-circle{ background:var(--walk-bg); color:var(--walk); }
   .entry .info{ flex:1; min-width:0; }
   .entry .info .type{ font-weight:600; font-size:14px; }
   .entry .info .meta{ font-size:12px; color:var(--ink-soft); margin-top:1px; }
@@ -300,13 +320,15 @@
   .trend-toggle[data-type="pee"]{ color:var(--pee); }
   .trend-toggle[data-type="poop"]{ color:var(--poop); }
   .trend-toggle[data-type="sleep"]{ color:var(--sleep); }
+  .trend-toggle[data-type="walk"]{ color:var(--walk); }
   .trend-toggle.active[data-type="eat"]{ background:var(--eat); border-color:var(--eat); color:#fff; }
   .trend-toggle.active[data-type="pee"]{ background:var(--pee); border-color:var(--pee); color:#fff; }
   .trend-toggle.active[data-type="poop"]{ background:var(--poop); border-color:var(--poop); color:#fff; }
   .trend-toggle.active[data-type="sleep"]{ background:var(--sleep); border-color:var(--sleep); color:#fff; }
+  .trend-toggle.active[data-type="walk"]{ background:var(--walk); border-color:var(--walk); color:#fff; }
 
   .heatmap-week-wrap{ overflow-x:auto; margin-top:4px; }
-  .heatmap-week{ display:grid; grid-template-columns: 20px repeat(28, 1fr); gap:1px; min-width:260px; align-items:center; }
+  .heatmap-week{ display:grid; grid-template-columns: 20px repeat(35, 1fr); gap:1px; min-width:280px; align-items:center; }
   .hmw-day-label{ font-size:9px; color:var(--ink-soft); text-align:center; font-family:'JetBrains Mono',monospace; line-height:1.3; padding-bottom:4px; }
   .hmw-hour-label{ height:4px; line-height:4px; overflow:visible; font-size:9px; color:var(--ink-soft); text-align:right; padding-right:4px; font-family:'JetBrains Mono',monospace; }
   .hmw-cell{ aspect-ratio:1/1; border-radius:1px; background:var(--cream); border:1px solid var(--line); }
@@ -444,7 +466,7 @@
           <div class="value" id="sinceSleep">–</div>
         </div>
       </div>
-      <div class="log-grid">
+      <div class="log-grid-instant">
         <button class="log-btn pee" id="btnPee">
           <span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2.5c3 4 6 7.7 6 11.3a6 6 0 1 1-12 0c0-3.6 3-7.3 6-11.3Z"/></svg></span>
           Pee
@@ -457,10 +479,17 @@
           <span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 11h17a7.5 7.5 0 0 1-15 0Z"/><path d="M3.5 11c0-1 1-1.8 2.2-1.8h12.6c1.2 0 2.2.8 2.2 1.8"/><path d="M8.5 9.2V5.5M12 9.2V4M15.5 9.2V5.5"/></svg></span>
           Eat
         </button>
-        <button class="log-btn sleep" id="btnSleep">
+      </div>
+      <div class="log-grid-toggle">
+        <button class="log-btn toggle-btn sleep" id="btnSleep">
           <span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg></span>
           <span id="sleepLabel">Sleep</span>
           <span class="sleep-timer" id="sleepTimer" style="display:none"></span>
+        </button>
+        <button class="log-btn toggle-btn walk" id="btnWalk">
+          <span class="circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16.5c0-2 1.5-3 3-3.5l5-1.5c1-3 3-4.5 5-4.5 2.5 0 4 2 4 4.5v3.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M3 16.5h18"/></svg></span>
+          <span id="walkLabel">Walk</span>
+          <span class="sleep-timer" id="walkTimer" style="display:none"></span>
         </button>
       </div>
 
@@ -482,6 +511,7 @@
           <button class="trend-toggle" data-type="pee">Pee</button>
           <button class="trend-toggle" data-type="poop">Poop</button>
           <button class="trend-toggle" data-type="sleep">Sleep</button>
+          <button class="trend-toggle" data-type="walk">Walk</button>
         </div>
         <div class="hist-nav">
           <button class="hist-nav-btn" id="dailyChartPrevWeek" aria-label="Previous 7 days">
@@ -497,11 +527,12 @@
 
       <div class="trend-card">
         <h3>Weekly heat map</h3>
-        <div class="heatmap-legend" style="margin:0 0 12px;">
+        <div class="heatmap-legend" style="margin:0 0 12px; flex-wrap:wrap;">
           <span class="legend-dot" style="background:var(--eat)"></span>Eat
           <span class="legend-dot" style="background:var(--pee); margin-left:8px;"></span>Pee
           <span class="legend-dot" style="background:var(--poop); margin-left:8px;"></span>Poop
           <span class="legend-dot" style="background:var(--sleep); margin-left:8px;"></span>Sleep
+          <span class="legend-dot" style="background:var(--walk); margin-left:8px;"></span>Walk
         </div>
         <div class="hist-nav">
           <button class="hist-nav-btn" id="trendPrevWeek" aria-label="Previous 7 days">
@@ -647,7 +678,6 @@
 <script>
 const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbymTAseFKjyBi-ZLOdJD_Qfwdz9YnBSCi8_roS5kf_vuPZODHdCOfz8Mb2-CpKP7Qo4Eg/exec';
 let entries = [];      // {id, type: 'pee'|'poop'|'sleep', start: ms, end: ms|null}
-let sleepStart = null;
 let notes = {};        // { 'YYYY-MM-DD': 'note text' }
 let weights = [];      // {id, date: 'YYYY-MM-DD', kg: number}
 let weightUnit = 'kg';
@@ -663,9 +693,10 @@ const ICONS = {
   pee: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2.5c3 4 6 7.7 6 11.3a6 6 0 1 1-12 0c0-3.6 3-7.3 6-11.3Z"/></svg>',
   poop: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3c1 1.5-1 2-1 3.3 0 .8.7 1.2 1.6 1.2 1.7 0 2.4-1.5 3.6-1.5 1.7 0 2.8 1.6 2.8 3.4 0 1-.4 1.8-1 2.4 1.6.5 2.8 2 2.8 3.9 0 2.4-2.4 4.3-7.8 4.3S5.2 18.1 5.2 15.7c0-1.8 1-3.2 2.5-3.8-.8-.6-1.3-1.6-1.3-2.7 0-2 1.6-3.5 3.5-3.5.6 0 1.1.1 1.6.4"/></svg>',
   sleep: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg>',
-  eat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 11h17a7.5 7.5 0 0 1-15 0Z"/><path d="M3.5 11c0-1 1-1.8 2.2-1.8h12.6c1.2 0 2.2.8 2.2 1.8"/><path d="M8.5 9.2V5.5M12 9.2V4M15.5 9.2V5.5"/></svg>'
+  eat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 11h17a7.5 7.5 0 0 1-15 0Z"/><path d="M3.5 11c0-1 1-1.8 2.2-1.8h12.6c1.2 0 2.2.8 2.2 1.8"/><path d="M8.5 9.2V5.5M12 9.2V4M15.5 9.2V5.5"/></svg>',
+  walk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16.5c0-2 1.5-3 3-3.5l5-1.5c1-3 3-4.5 5-4.5 2.5 0 4 2 4 4.5v3.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M3 16.5h18"/></svg>'
 };
-const LABELS = { pee:'Pee', poop:'Poop', sleep:'Sleep', eat:'Eat' };
+const LABELS = { pee:'Pee', poop:'Poop', sleep:'Sleep', eat:'Eat', walk:'Walk' };
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
@@ -680,14 +711,20 @@ async function loadData(){
     if(!res.ok) throw new Error('Sheet request failed: ' + res.status);
     const json = await res.json();
     entries = json.entries || [];
-    sleepStart = json.sleepStart || null;
     notes = json.notes || {};
     weights = json.weights || [];
     weightUnit = json.weightUnit || 'kg';
+    // one-time migration: an old-style in-progress nap (stored separately,
+    // before ongoing sleeps became a real editable entry) — carry it forward
+    // rather than silently losing it.
+    const hasActiveEntry = entries.some(e => e.type === 'sleep' && (e.end === null || e.end === undefined));
+    if(json.sleepStart && !hasActiveEntry){
+      entries.push({id: uid(), type: 'sleep', start: json.sleepStart, end: null});
+    }
     dataLoaded = true;
   }catch(e){
     console.log('Failed to load from the sheet — refusing future saves until a reload succeeds.', e);
-    entries = []; sleepStart = null; notes = {}; weights = []; weightUnit = 'kg';
+    entries = []; notes = {}; weights = []; weightUnit = 'kg';
     dataLoaded = false;
     showConnError();
   }
@@ -706,7 +743,7 @@ async function saveData(opts){
     const res = await fetch(SHEET_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight to Apps Script
-      body: JSON.stringify({entries, sleepStart, notes, weights, weightUnit, allowWipe: !!opts.allowWipe})
+      body: JSON.stringify({entries, notes, weights, weightUnit, allowWipe: !!opts.allowWipe})
     });
     if(!res.ok) throw new Error('Sheet save failed: ' + res.status);
     const json = await res.json().catch(() => null);
@@ -775,7 +812,7 @@ function renderQuickStats(){
   document.getElementById('sincePoop').textContent = lastPoop ? fmtElapsed(Date.now()-lastPoop.start) : '–';
 
   const sinceSleepEl = document.getElementById('sinceSleep');
-  if(sleepStart){
+  if(getActiveTimedEntry('sleep')){
     sinceSleepEl.textContent = 'Sleeping now';
   } else if(lastSleepEntry){
     sinceSleepEl.textContent = fmtElapsed(Date.now()-lastSleepEntry.end);
@@ -789,8 +826,10 @@ function entryRow(e){
   div.className = 'entry ' + e.type;
   div.onclick = () => openEdit(e.id);
   let metaText = '';
-  if(e.type === 'sleep'){
-    metaText = e.end ? ('Slept ' + fmtDuration(e.end - e.start)) : 'Sleeping now…';
+  if(TIMED_TYPES.includes(e.type)){
+    const verb = e.type === 'sleep' ? 'Slept' : 'Walked';
+    const ongoingVerb = e.type === 'sleep' ? 'Sleeping now…' : 'Walking now…';
+    metaText = e.end ? (verb + ' ' + fmtDuration(e.end - e.start)) : ongoingVerb;
   }
   div.innerHTML = `
     <div class="icon-circle">${ICONS[e.type]}</div>
@@ -805,8 +844,9 @@ function entryRow(e){
 
 let selectedHistoryDate = dateKey(Date.now());
 
-const HM_RGB = { eat:'110,140,78', pee:'91,155,213', poop:'217,178,60', sleep:'155,150,137' };
-const HM_ROWS = [ ['eat','Eat'], ['pee','Pee'], ['poop','Poop'], ['sleep','Sleep'] ];
+const HM_RGB = { eat:'110,140,78', pee:'91,155,213', poop:'217,178,60', sleep:'155,150,137', walk:'62,143,143' };
+const HM_ROWS = [ ['eat','Eat'], ['pee','Pee'], ['poop','Poop'], ['sleep','Sleep'], ['walk','Walk'] ];
+const TIMED_TYPES = ['sleep', 'walk']; // activities with a start AND end, tracked by duration rather than count
 
 function getDayBounds(key){
   const start = new Date(key+'T00:00:00').getTime();
@@ -831,16 +871,18 @@ function computeHeatmapData(key){
   const [dayStart, dayEnd] = getDayBounds(key);
   const counts = { eat:new Array(24).fill(0), pee:new Array(24).fill(0), poop:new Array(24).fill(0) };
   const sleepFrac = new Array(24).fill(0);
+  const walkFrac = new Array(24).fill(0);
   entries.forEach(e => {
     if(e.type === 'sleep'){
       accumulateSleepHours(e.start, e.end, dayStart, dayEnd, sleepFrac, 3600000);
+    } else if(e.type === 'walk'){
+      accumulateSleepHours(e.start, e.end, dayStart, dayEnd, walkFrac, 3600000);
     } else if(dateKey(e.start) === key){
       const h = new Date(e.start).getHours();
       counts[e.type][h] += 1;
     }
   });
-  if(sleepStart) accumulateSleepHours(sleepStart, null, dayStart, dayEnd, sleepFrac, 3600000);
-  return { counts, sleepFrac };
+  return { counts, sleepFrac, walkFrac };
 }
 
 // 15-minute-resolution variant, used by the weekly heat map only
@@ -849,24 +891,26 @@ function computeHeatmapData15(key){
   const [dayStart, dayEnd] = getDayBounds(key);
   const counts = { eat:new Array(96).fill(0), pee:new Array(96).fill(0), poop:new Array(96).fill(0) };
   const sleepFrac = new Array(96).fill(0);
+  const walkFrac = new Array(96).fill(0);
   entries.forEach(e => {
     if(e.type === 'sleep'){
       accumulateSleepHours(e.start, e.end, dayStart, dayEnd, sleepFrac, QUARTER_MS);
+    } else if(e.type === 'walk'){
+      accumulateSleepHours(e.start, e.end, dayStart, dayEnd, walkFrac, QUARTER_MS);
     } else if(dateKey(e.start) === key){
       const d = new Date(e.start);
       const slot = Math.floor((d.getHours()*60 + d.getMinutes()) / 15);
       counts[e.type][slot] += 1;
     }
   });
-  if(sleepStart) accumulateSleepHours(sleepStart, null, dayStart, dayEnd, sleepFrac, QUARTER_MS);
-  return { counts, sleepFrac };
+  return { counts, sleepFrac, walkFrac };
 }
 
 function heatCellStyle(type, val, maxSleepVal){
   if(!val) return `background:var(--cream);`;
   const rgb = HM_RGB[type];
   let alpha;
-  if(type === 'sleep'){
+  if(TIMED_TYPES.includes(type)){
     const norm = maxSleepVal ? Math.min(1, val/maxSleepVal) : Math.min(1, val);
     alpha = Math.min(1, 0.25 + norm*0.75);
   } else {
@@ -875,9 +919,14 @@ function heatCellStyle(type, val, maxSleepVal){
   return `background:rgba(${rgb},${alpha}); border-color:transparent;`;
 }
 
+function activityCellValue(type, counts, sleepFrac, walkFrac, idx){
+  if(type === 'sleep') return sleepFrac[idx];
+  if(type === 'walk') return walkFrac[idx];
+  return counts[type][idx];
+}
+
 function renderHeatmap(key){
-  const { counts, sleepFrac } = computeHeatmapData(key);
-  const data = { eat:counts.eat, pee:counts.pee, poop:counts.poop, sleep:sleepFrac };
+  const { counts, sleepFrac, walkFrac } = computeHeatmapData(key);
   let html = '<div class="hm-row-label"></div>';
   for(let h=0; h<24; h++){
     html += `<div class="hm-hour-label">${h % 3 === 0 ? h : ''}</div>`;
@@ -885,8 +934,10 @@ function renderHeatmap(key){
   HM_ROWS.forEach(([type,label]) => {
     html += `<div class="hm-row-label">${label}</div>`;
     for(let h=0; h<24; h++){
-      const val = data[type][h];
-      const title = type === 'sleep' ? Math.round(val*60)+'m asleep' : (val + ' ' + label.toLowerCase() + (val===1?'':'s'));
+      const val = activityCellValue(type, counts, sleepFrac, walkFrac, h);
+      const title = TIMED_TYPES.includes(type)
+        ? Math.round(val*60)+'m ' + (type==='sleep' ? 'asleep' : 'walked')
+        : (val + ' ' + label.toLowerCase() + (val===1?'':'s'));
       html += `<div class="hm-cell" title="${val ? title : ''}" style="${heatCellStyle(type, val)}"></div>`;
     }
   });
@@ -994,10 +1045,12 @@ function renderHistory(){
   const dayEntries = entries.filter(e => dateKey(e.start) === selectedHistoryDate).sort((a,b)=>b.start-a.start);
   const dayPeeCount = dayEntries.filter(e => e.type === 'pee').length;
   const dayPoopCount = dayEntries.filter(e => e.type === 'poop').length;
-  const daySleepHrsMs = computeHeatmapData(selectedHistoryDate).sleepFrac.reduce((a,b)=>a+b, 0) * 3600000;
+  const dayHeatmapData = computeHeatmapData(selectedHistoryDate);
+  const daySleepHrsMs = dayHeatmapData.sleepFrac.reduce((a,b)=>a+b, 0) * 3600000;
+  const dayWalkHrsMs = dayHeatmapData.walkFrac.reduce((a,b)=>a+b, 0) * 3600000;
 
   const dayStats = document.createElement('div');
-  dayStats.className = 'stats stats-3';
+  dayStats.className = 'stats stats-4';
   dayStats.style.marginBottom = '16px';
   dayStats.innerHTML = `
     <div class="stat">
@@ -1011,6 +1064,10 @@ function renderHistory(){
     <div class="stat">
       <div class="label"><span class="dot" style="background:var(--sleep)"></span>Sleep</div>
       <div class="value">${daySleepHrsMs > 0 ? fmtElapsed(daySleepHrsMs) : '0m'}</div>
+    </div>
+    <div class="stat">
+      <div class="label"><span class="dot" style="background:var(--walk)"></span>Walk</div>
+      <div class="value">${dayWalkHrsMs > 0 ? fmtElapsed(dayWalkHrsMs) : '0m'}</div>
     </div>
   `;
   container.appendChild(dayStats);
@@ -1075,13 +1132,13 @@ function renderTrendHeatmap(){
   const endLabel = new Date(days[6]+'T12:00:00').toLocaleDateString([], {month:'short', day:'numeric'});
   document.getElementById('trendWeekLabel').textContent = `${startLabel} – ${endLabel}`;
 
-  // one computeHeatmapData15 call per day, reused across all 4 activity sub-columns
+  // one computeHeatmapData15 call per day, reused across all 5 activity sub-columns
   const dayData = days.map(k => computeHeatmapData15(k));
 
   let html = '<div class="hmw-hour-label"></div>';
   days.forEach(k => {
     const d = new Date(k+'T12:00:00');
-    html += `<div class="hmw-day-label" style="grid-column: span 4;">${d.toLocaleDateString([], {weekday:'narrow'})}<br>${d.getDate()}</div>`;
+    html += `<div class="hmw-day-label" style="grid-column: span 5;">${d.toLocaleDateString([], {weekday:'narrow'})}<br>${d.getDate()}</div>`;
   });
   for(let slot=0; slot<96; slot++){
     const hour = Math.floor(slot/4);
@@ -1089,11 +1146,11 @@ function renderTrendHeatmap(){
     const showLabel = minute === 0 && hour % 3 === 0;
     const hourStart = minute === 0 && slot > 0;
     html += `<div class="hmw-hour-label" style="${hourStart ? 'border-top:1px solid rgba(58,85,65,0.35);' : ''}">${showLabel ? hour : ''}</div>`;
-    dayData.forEach(({counts, sleepFrac}, dayIdx) => {
+    dayData.forEach(({counts, sleepFrac, walkFrac}, dayIdx) => {
       HM_ROWS.forEach(([type, typeLabel], actIdx) => {
-        const val = type === 'sleep' ? sleepFrac[slot] : counts[type][slot];
-        const title = type === 'sleep'
-          ? (val ? Math.round(val*60)+'m asleep' : '')
+        const val = activityCellValue(type, counts, sleepFrac, walkFrac, slot);
+        const title = TIMED_TYPES.includes(type)
+          ? (val ? Math.round(val*60)+'m ' + (type==='sleep' ? 'asleep' : 'walked') : '')
           : (val ? val + ' ' + typeLabel.toLowerCase() + (val===1?'':'s') : '');
         const groupBorder = (actIdx === 0 && dayIdx > 0) ? 'border-left:2px solid var(--ink-soft);' : '';
         const hourBorder = hourStart ? 'border-top:1px solid rgba(58,85,65,0.35);' : '';
@@ -1138,6 +1195,7 @@ function renderDailyChart(){
 
   const values = days.map(k => {
     if(dailyChartActivity === 'sleep') return computeHeatmapData(k).sleepFrac.reduce((a,b)=>a+b, 0);
+    if(dailyChartActivity === 'walk') return computeHeatmapData(k).walkFrac.reduce((a,b)=>a+b, 0);
     return entries.filter(e => e.type === dailyChartActivity && dateKey(e.start) === k).length;
   });
 
@@ -1161,7 +1219,7 @@ function renderDailyChart(){
   const circles = values.map((v,i) => {
     const cx = xScale(i).toFixed(1), cy = yScale(v).toFixed(1);
     const dayLbl = new Date(days[i]+'T12:00:00').toLocaleDateString([], {weekday:'short', month:'short', day:'numeric'});
-    const valLabel = dailyChartActivity === 'sleep' ? v.toFixed(1)+'h' : v;
+    const valLabel = TIMED_TYPES.includes(dailyChartActivity) ? v.toFixed(1)+'h' : v;
     return `<circle cx="${cx}" cy="${cy}" r="3" fill="${color}"><title>${dayLbl}: ${valLabel}</title></circle>`;
   }).join('');
 
@@ -1539,20 +1597,28 @@ async function setWeightUnit(u){
   renderWeightTab();
 }
 
-function renderSleepButton(){
-  const btn = document.getElementById('btnSleep');
-  const label = document.getElementById('sleepLabel');
-  const timer = document.getElementById('sleepTimer');
-  if(sleepStart){
+function renderTimedButton(type){
+  const btnId = type === 'sleep' ? 'btnSleep' : 'btnWalk';
+  const labelId = type === 'sleep' ? 'sleepLabel' : 'walkLabel';
+  const timerId = type === 'sleep' ? 'sleepTimer' : 'walkTimer';
+  const btn = document.getElementById(btnId);
+  const label = document.getElementById(labelId);
+  const timer = document.getElementById(timerId);
+  const active = getActiveTimedEntry(type);
+  if(active){
     btn.classList.add('active');
-    label.textContent = 'End sleep';
+    label.textContent = 'End ' + LABELS[type].toLowerCase();
     timer.style.display = 'block';
-    timer.textContent = fmtElapsed(Date.now() - sleepStart);
+    timer.textContent = fmtElapsed(Date.now() - active.start);
   } else {
     btn.classList.remove('active');
-    label.textContent = 'Sleep';
+    label.textContent = LABELS[type];
     timer.style.display = 'none';
   }
+}
+function renderSleepButton(){
+  renderTimedButton('sleep');
+  renderTimedButton('walk');
 }
 
 function flashLogged(text){
@@ -1572,15 +1638,43 @@ async function logInstant(type){
   flashLogged(LABELS[type] + ' logged at ' + fmtTime(e.start));
 }
 
-async function toggleSleep(){
-  if(sleepStart){
-    entries.push({id: uid(), type:'sleep', start: sleepStart, end: Date.now()});
-    sleepStart = null;
+// Splits a start/end interval into multiple segments if it crosses one or more
+// midnights — each segment ends at 23:59:59.999 of its day (i.e. the instant
+// before the next day starts) and the next segment begins at 00:00 of that next day.
+function splitAtMidnight(start, end){
+  const segments = [];
+  let segStart = start;
+  while(true){
+    const nextMidnight = getDayBounds(dateKey(segStart))[1];
+    if(end <= nextMidnight){
+      segments.push({start: segStart, end: end});
+      break;
+    }
+    segments.push({start: segStart, end: nextMidnight - 1});
+    segStart = nextMidnight;
+  }
+  return segments;
+}
+
+function getActiveTimedEntry(type){
+  return entries.find(e => e.type === type && (e.end === null || e.end === undefined));
+}
+
+async function toggleTimedActivity(type){
+  const active = getActiveTimedEntry(type);
+  if(active){
+    // End it — split across midnight using whatever start time is currently
+    // set (which may have been corrected via the edit modal while it was ongoing).
+    const segments = splitAtMidnight(active.start, Date.now());
+    entries = entries.filter(x => x.id !== active.id);
+    segments.forEach(seg => entries.push({id: uid(), type, start: seg.start, end: seg.end}));
     await saveData();
     render();
-    flashLogged('Sleep logged');
+    flashLogged(LABELS[type] + ' logged');
   } else {
-    sleepStart = Date.now();
+    // Start it — create a real entry right away so the start time can be
+    // corrected (by tapping it in the list) before it ends.
+    entries.push({id: uid(), type, start: Date.now(), end: null});
     await saveData();
     render();
   }
@@ -1594,11 +1688,13 @@ function openEdit(id){
   document.getElementById('editTime').value = toLocalInputValue(e.start);
   const endLabel = document.getElementById('editTimeEndLabel');
   const endInput = document.getElementById('editTimeEnd');
-  document.getElementById('editTimeLabel').textContent = e.type === 'sleep' ? 'Start time' : 'Time';
-  if(e.type === 'sleep'){
+  const isTimed = TIMED_TYPES.includes(e.type);
+  const isOngoing = isTimed && (e.end === null || e.end === undefined);
+  document.getElementById('editTimeLabel').textContent = isTimed ? 'Start time' : 'Time';
+  if(isTimed && !isOngoing){
     endLabel.style.display = 'block';
     endInput.style.display = 'block';
-    endInput.value = toLocalInputValue(e.end || Date.now());
+    endInput.value = toLocalInputValue(e.end);
   } else {
     endLabel.style.display = 'none';
     endInput.style.display = 'none';
@@ -1613,9 +1709,22 @@ function closeEdit(){
 async function saveEdit(){
   const e = entries.find(x=>x.id===editingId);
   if(!e){ closeEdit(); return; }
-  e.start = fromLocalInputValue(document.getElementById('editTime').value);
-  if(e.type === 'sleep'){
-    e.end = fromLocalInputValue(document.getElementById('editTimeEnd').value);
+  const newStart = fromLocalInputValue(document.getElementById('editTime').value);
+  const isTimed = TIMED_TYPES.includes(e.type);
+  const isOngoing = isTimed && (e.end === null || e.end === undefined);
+  if(isTimed && !isOngoing){
+    const newEnd = fromLocalInputValue(document.getElementById('editTimeEnd').value);
+    const segments = splitAtMidnight(newStart, newEnd);
+    if(segments.length > 1){
+      entries = entries.filter(x => x.id !== editingId);
+      segments.forEach(seg => entries.push({id: uid(), type: e.type, start: seg.start, end: seg.end}));
+    } else {
+      e.start = newStart;
+      e.end = newEnd;
+    }
+  } else {
+    // pee/poop/eat, or a still-ongoing sleep/walk — only the start time is editable
+    e.start = newStart;
   }
   await saveData();
   closeEdit();
@@ -1635,6 +1744,40 @@ function switchTab(name){
   if(name === 'trends') renderTrends();
 }
 
+const TAB_ORDER = ['log', 'weight', 'trends'];
+function setupSwipeNavigation(){
+  let startX = 0, startY = 0, startTarget = null;
+  const THRESHOLD = 60;
+
+  document.addEventListener('touchstart', (ev) => {
+    if(ev.touches.length !== 1) return;
+    startX = ev.touches[0].clientX;
+    startY = ev.touches[0].clientY;
+    startTarget = ev.target;
+  }, {passive:true});
+
+  document.addEventListener('touchend', (ev) => {
+    if(!startTarget) return;
+    const target = startTarget;
+    startTarget = null;
+
+    // don't hijack swipes on sliders, horizontally-scrolling widgets, or open modals
+    if(target.closest('input[type=range]') || target.closest('.heatmap-week-wrap') ||
+       target.closest('.weight-chart-outer') || target.closest('.overlay.show')) return;
+
+    const touch = ev.changedTouches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    if(Math.abs(dx) < THRESHOLD || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+
+    const activeBtn = document.querySelector('.tab.active');
+    const current = activeBtn ? activeBtn.dataset.tab : 'log';
+    const idx = TAB_ORDER.indexOf(current);
+    if(dx < 0 && idx < TAB_ORDER.length - 1) switchTab(TAB_ORDER[idx + 1]);
+    else if(dx > 0 && idx > 0) switchTab(TAB_ORDER[idx - 1]);
+  }, {passive:true});
+}
+
 // ---------- init ----------
 async function refreshData(){
   document.getElementById('connBanner').style.display = 'none';
@@ -1647,6 +1790,13 @@ async function refreshData(){
 }
 
 async function init(){
+  // iOS Safari won't apply :active/hover states on tap unless a touch listener
+  // is registered somewhere in the document — this is what makes button press
+  // feedback "just work" on iPhone.
+  document.addEventListener('touchstart', function(){}, {passive:true});
+
+  setupSwipeNavigation();
+
   await loadData();
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
@@ -1654,8 +1804,9 @@ async function init(){
 
   document.getElementById('btnPee').onclick = () => logInstant('pee');
   document.getElementById('btnPoop').onclick = () => logInstant('poop');
-  document.getElementById('btnSleep').onclick = toggleSleep;
+  document.getElementById('btnSleep').onclick = () => toggleTimedActivity('sleep');
   document.getElementById('btnEat').onclick = () => logInstant('eat');
+  document.getElementById('btnWalk').onclick = () => toggleTimedActivity('walk');
 
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
 
@@ -1719,7 +1870,7 @@ async function init(){
   document.getElementById('resetCancel').onclick = () => document.getElementById('resetOverlay').classList.remove('show');
   document.getElementById('resetConfirm').onclick = () => {
     document.getElementById('resetOverlay').classList.remove('show');
-    const n = entries.length + (sleepStart ? 1 : 0);
+    const n = entries.length;
     document.getElementById('resetCount').textContent = n === 1 ? '1 entry' : (n + ' entries');
     document.getElementById('resetOverlay2').classList.add('show');
   };
@@ -1727,14 +1878,14 @@ async function init(){
 
   document.getElementById('resetCancel2').onclick = () => document.getElementById('resetOverlay2').classList.remove('show');
   document.getElementById('resetConfirm2').onclick = async () => {
-    entries = []; sleepStart = null;
+    entries = [];
     await saveData({allowWipe: true});
     document.getElementById('resetOverlay2').classList.remove('show');
     render();
   };
   document.getElementById('resetOverlay2').onclick = (ev) => { if(ev.target.id==='resetOverlay2') document.getElementById('resetOverlay2').classList.remove('show'); };
 
-  setInterval(() => { renderQuickStats(); if(sleepStart) renderSleepButton(); }, 15000);
+  setInterval(() => { renderQuickStats(); if(getActiveTimedEntry('sleep') || getActiveTimedEntry('walk')) renderSleepButton(); }, 15000);
 }
 
 init();
