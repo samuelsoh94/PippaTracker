@@ -707,7 +707,7 @@ function showConnError(){
 
 async function loadData(){
   try{
-    const res = await fetch(SHEET_API_URL);
+    const res = await fetch(`${SHEET_API_URL}?t=${Date.now()}`, { cache: 'no-store' });
     if(!res.ok) throw new Error('Sheet request failed: ' + res.status);
     const json = await res.json();
     entries = json.entries || [];
@@ -730,30 +730,32 @@ async function loadData(){
   }
 }
 
-async function saveData(opts){
-  opts = opts || {};
+async function postAction(action, payload){
   if(!dataLoaded){
-    // Refuse to overwrite the sheet with possibly-incomplete local data —
-    // this is what previously allowed a failed load to wipe real data.
+    // Refuse to act on possibly-incomplete local data — avoid building on top
+    // of a failed load.
     console.error('Refusing to save: initial data load never completed successfully.');
     showConnError();
-    return;
+    return false;
   }
   try{
     const res = await fetch(SHEET_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight to Apps Script
-      body: JSON.stringify({entries, notes, weights, weightUnit, allowWipe: !!opts.allowWipe})
+      body: JSON.stringify(Object.assign({action}, payload))
     });
     if(!res.ok) throw new Error('Sheet save failed: ' + res.status);
     const json = await res.json().catch(() => null);
     if(json && json.ok === false){
       console.error('Save refused by the sheet backend:', json.error);
       showConnError();
+      return false;
     }
+    return true;
   }catch(e){
     console.error('Failed to save to the sheet', e);
     showConnError();
+    return false;
   }
 }
 
@@ -964,10 +966,11 @@ function autosizeTextarea(el){
 async function saveNote(key, value){
   if(!value.trim()){
     delete notes[key];
+    await postAction('deleteNote', {date: key});
   } else {
     notes[key] = value;
+    await postAction('setNote', {date: key, text: value});
   }
-  await saveData();
 }
 
 function renderNotesInto(container, key){
@@ -1577,23 +1580,25 @@ async function saveWeightModal(){
   if(editingWeightId){
     const w = weights.find(x => x.id === editingWeightId);
     if(w){ w.date = dateVal; w.kg = kg; }
+    await postAction('updateWeight', {id: editingWeightId, date: dateVal, kg});
   } else {
-    weights.push({id: uid(), date: dateVal, kg});
+    const w = {id: uid(), date: dateVal, kg};
+    weights.push(w);
+    await postAction('addWeight', {weight: w});
   }
-  await saveData();
   closeWeightModal();
   renderWeightTab();
 }
 async function deleteWeightModal(){
   weights = weights.filter(x => x.id !== editingWeightId);
-  await saveData();
+  await postAction('deleteWeight', {id: editingWeightId});
   closeWeightModal();
   renderWeightTab();
 }
 async function setWeightUnit(u){
   if(weightUnit === u) return;
   weightUnit = u;
-  await saveData();
+  await postAction('setMeta', {key: 'weightUnit', value: u});
   renderWeightTab();
 }
 
@@ -1633,7 +1638,7 @@ function flashLogged(text){
 async function logInstant(type){
   const e = {id: uid(), type, start: Date.now(), end: null};
   entries.push(e);
-  await saveData();
+  await postAction('addEntry', {entry: e});
   render();
   flashLogged(LABELS[type] + ' logged at ' + fmtTime(e.start));
 }
@@ -1665,17 +1670,18 @@ async function toggleTimedActivity(type){
   if(active){
     // End it — split across midnight using whatever start time is currently
     // set (which may have been corrected via the edit modal while it was ongoing).
-    const segments = splitAtMidnight(active.start, Date.now());
+    const segments = splitAtMidnight(active.start, Date.now()).map(seg => ({id: uid(), type, start: seg.start, end: seg.end}));
     entries = entries.filter(x => x.id !== active.id);
-    segments.forEach(seg => entries.push({id: uid(), type, start: seg.start, end: seg.end}));
-    await saveData();
+    segments.forEach(seg => entries.push(seg));
+    await postAction('replaceEntries', {removeIds: [active.id], addEntries: segments});
     render();
     flashLogged(LABELS[type] + ' logged');
   } else {
     // Start it — create a real entry right away so the start time can be
     // corrected (by tapping it in the list) before it ends.
-    entries.push({id: uid(), type, start: Date.now(), end: null});
-    await saveData();
+    const e = {id: uid(), type, start: Date.now(), end: null};
+    entries.push(e);
+    await postAction('addEntry', {entry: e});
     render();
   }
 }
@@ -1716,23 +1722,26 @@ async function saveEdit(){
     const newEnd = fromLocalInputValue(document.getElementById('editTimeEnd').value);
     const segments = splitAtMidnight(newStart, newEnd);
     if(segments.length > 1){
+      const newEntries = segments.map(seg => ({id: uid(), type: e.type, start: seg.start, end: seg.end}));
       entries = entries.filter(x => x.id !== editingId);
-      segments.forEach(seg => entries.push({id: uid(), type: e.type, start: seg.start, end: seg.end}));
+      newEntries.forEach(seg => entries.push(seg));
+      await postAction('replaceEntries', {removeIds: [editingId], addEntries: newEntries});
     } else {
       e.start = newStart;
       e.end = newEnd;
+      await postAction('updateEntry', {id: e.id, start: e.start, end: e.end});
     }
   } else {
     // pee/poop/eat, or a still-ongoing sleep/walk — only the start time is editable
     e.start = newStart;
+    await postAction('updateEntry', {id: e.id, start: e.start, end: e.end});
   }
-  await saveData();
   closeEdit();
   render();
 }
 async function deleteEdit(){
   entries = entries.filter(x=>x.id!==editingId);
-  await saveData();
+  await postAction('deleteEntry', {id: editingId});
   closeEdit();
   render();
 }
@@ -1879,7 +1888,7 @@ async function init(){
   document.getElementById('resetCancel2').onclick = () => document.getElementById('resetOverlay2').classList.remove('show');
   document.getElementById('resetConfirm2').onclick = async () => {
     entries = [];
-    await saveData({allowWipe: true});
+    await postAction('clearEntries', {});
     document.getElementById('resetOverlay2').classList.remove('show');
     render();
   };
