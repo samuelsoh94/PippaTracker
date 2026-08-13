@@ -705,6 +705,30 @@ function showConnError(){
   if(b) b.style.display = 'block';
 }
 
+const CACHE_KEY = 'pippa-cache-v1';
+
+function loadCache(){
+  try{
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){
+    return null;
+  }
+}
+function saveCache(){
+  try{
+    localStorage.setItem(CACHE_KEY, JSON.stringify({entries, notes, weights, weightUnit}));
+  }catch(e){
+    // storage full/unavailable — non-fatal, just skip caching this time
+  }
+}
+function applyCache(cached){
+  entries = cached.entries || [];
+  notes = cached.notes || {};
+  weights = cached.weights || [];
+  weightUnit = cached.weightUnit || 'kg';
+}
+
 async function loadData(){
   try{
     const res = await fetch(`${SHEET_API_URL}?t=${Date.now()}`, { cache: 'no-store' });
@@ -722,9 +746,12 @@ async function loadData(){
       entries.push({id: uid(), type: 'sleep', start: json.sleepStart, end: null});
     }
     dataLoaded = true;
+    saveCache();
   }catch(e){
-    console.log('Failed to load from the sheet — refusing future saves until a reload succeeds.', e);
-    entries = []; notes = {}; weights = []; weightUnit = 'kg';
+    // Deliberately don't clear entries/notes/weights here — if this was a
+    // background refresh on top of good cached data, we want to keep showing
+    // that cached data rather than wipe the screen over a network hiccup.
+    console.log('Failed to load from the sheet.', e);
     dataLoaded = false;
     showConnError();
   }
@@ -751,6 +778,7 @@ async function postAction(action, payload){
       showConnError();
       return false;
     }
+    saveCache(); // keep the local cache in sync with our own successful changes
     return true;
   }catch(e){
     console.error('Failed to save to the sheet', e);
@@ -1798,19 +1826,7 @@ async function refreshData(){
   render();
 }
 
-async function init(){
-  // iOS Safari won't apply :active/hover states on tap unless a touch listener
-  // is registered somewhere in the document — this is what makes button press
-  // feedback "just work" on iPhone.
-  document.addEventListener('touchstart', function(){}, {passive:true});
-
-  setupSwipeNavigation();
-
-  await loadData();
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  render();
-
+function wireUpControls(){
   document.getElementById('btnPee').onclick = () => logInstant('pee');
   document.getElementById('btnPoop').onclick = () => logInstant('poop');
   document.getElementById('btnSleep').onclick = () => toggleTimedActivity('sleep');
@@ -1895,6 +1911,34 @@ async function init(){
   document.getElementById('resetOverlay2').onclick = (ev) => { if(ev.target.id==='resetOverlay2') document.getElementById('resetOverlay2').classList.remove('show'); };
 
   setInterval(() => { renderQuickStats(); if(getActiveTimedEntry('sleep') || getActiveTimedEntry('walk')) renderSleepButton(); }, 15000);
+}
+
+async function init(){
+  // iOS Safari won't apply :active/hover states on tap unless a touch listener
+  // is registered somewhere in the document — this is what makes button press
+  // feedback "just work" on iPhone.
+  document.addEventListener('touchstart', function(){}, {passive:true});
+
+  setupSwipeNavigation();
+  wireUpControls();
+
+  const cached = loadCache();
+  if(cached){
+    // Show cached data immediately — no loading screen, no wait — then quietly
+    // fetch the real latest data in the background and update once it arrives.
+    applyCache(cached);
+    dataLoaded = true;
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    render();
+    loadData().then(() => { if(dataLoaded) render(); });
+  } else {
+    // First-ever open on this device — nothing to show yet, so it's a normal load.
+    await loadData();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    render();
+  }
 }
 
 init();
