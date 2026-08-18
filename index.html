@@ -1346,7 +1346,7 @@ function renderTrends(){
     <div class="kv-row"><span class="k">Avg time between pees</span><span class="v">${avgGap ? fmtDuration(avgGap) : '–'}</span></div>
     <div class="kv-row"><span class="k">Avg pees per day</span><span class="v">${avgPeePerDay.toFixed(1)}</span></div>
     <div class="kv-row"><span class="k">Avg poops per day</span><span class="v">${avgPoopPerDay.toFixed(1)}</span></div>
-    <div class="kv-row"><span class="k">Avg sleep, hrs per day</span><span class="v">${avgSleepHrsPerDay.toFixed(1)}</span></div>
+    <div class="kv-row"><span class="k">Avg sleep per day</span><span class="v">${fmtElapsed(avgSleepHrsPerDay * 3600000)}</span></div>
     <div class="kv-row"><span class="k">Avg morning wake-up</span><span class="v">${avgWakeLabel}</span></div>
   `;
 
