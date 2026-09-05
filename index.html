@@ -692,8 +692,38 @@
   </div>
 </div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, writeBatch,
+  onSnapshot, getDocs, getDocsFromServer, getDocFromServer,
+  enableIndexedDbPersistence
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDzzOi0WIMFeosD0RAZa_eIfPiXC1SMJwQ",
+  authDomain: "pippa-s-log.firebaseapp.com",
+  projectId: "pippa-s-log",
+  storageBucket: "pippa-s-log.firebasestorage.app",
+  messagingSenderId: "1011108498433",
+  appId: "1:1011108498433:web:faef08caaf9d11b8ad0400"
+};
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+enableIndexedDbPersistence(db).catch(() => {
+  // Multiple tabs open, or the browser doesn't support it — realtime sync
+  // still works fine, just without the offline cache in that specific case.
+});
+
+const entriesCol = collection(db, 'entries');
+const notesCol = collection(db, 'notes');
+const weightsCol = collection(db, 'weights');
+const metaDocRef = doc(db, 'meta', 'settings');
+
+// Old Google Sheets API — kept only as a one-time migration source, not used
+// for anything else going forward.
 const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbymTAseFKjyBi-ZLOdJD_Qfwdz9YnBSCi8_roS5kf_vuPZODHdCOfz8Mb2-CpKP7Qo4Eg/exec';
+
 let entries = [];      // {id, type: 'pee'|'poop'|'sleep', start: ms, end: ms|null}
 let notes = {};        // { 'YYYY-MM-DD': 'note text' }
 let weights = [];      // {id, date: 'YYYY-MM-DD', kg: number}
@@ -722,87 +752,121 @@ function showConnError(){
   if(b) b.style.display = 'block';
 }
 
-const CACHE_KEY = 'pippa-cache-v1';
-
-function loadCache(){
+// Wraps a Firestore write with consistent error handling — used by every
+// mutation function below instead of the old postAction().
+async function fbWrite(op){
   try{
-    const raw = localStorage.getItem(CACHE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  }catch(e){
-    return null;
-  }
-}
-function saveCache(){
-  try{
-    localStorage.setItem(CACHE_KEY, JSON.stringify({entries, notes, weights, weightUnit}));
-  }catch(e){
-    // storage full/unavailable — non-fatal, just skip caching this time
-  }
-}
-function applyCache(cached){
-  entries = cached.entries || [];
-  notes = cached.notes || {};
-  weights = cached.weights || [];
-  weightUnit = cached.weightUnit || 'kg';
-}
-
-async function loadData(){
-  try{
-    const res = await fetch(`${SHEET_API_URL}?t=${Date.now()}`, { cache: 'no-store' });
-    if(!res.ok) throw new Error('Sheet request failed: ' + res.status);
-    const json = await res.json();
-    entries = json.entries || [];
-    notes = json.notes || {};
-    weights = json.weights || [];
-    weightUnit = json.weightUnit || 'kg';
-    // one-time migration: an old-style in-progress nap (stored separately,
-    // before ongoing sleeps became a real editable entry) — carry it forward
-    // rather than silently losing it.
-    const hasActiveEntry = entries.some(e => e.type === 'sleep' && (e.end === null || e.end === undefined));
-    if(json.sleepStart && !hasActiveEntry){
-      entries.push({id: uid(), type: 'sleep', start: json.sleepStart, end: null});
-    }
-    dataLoaded = true;
-    saveCache();
-  }catch(e){
-    // Deliberately don't clear entries/notes/weights here — if this was a
-    // background refresh on top of good cached data, we want to keep showing
-    // that cached data rather than wipe the screen over a network hiccup.
-    console.log('Failed to load from the sheet.', e);
-    dataLoaded = false;
-    showConnError();
-  }
-}
-
-async function postAction(action, payload){
-  if(!dataLoaded){
-    // Refuse to act on possibly-incomplete local data — avoid building on top
-    // of a failed load.
-    console.error('Refusing to save: initial data load never completed successfully.');
-    showConnError();
-    return false;
-  }
-  try{
-    const res = await fetch(SHEET_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // avoids a CORS preflight to Apps Script
-      body: JSON.stringify(Object.assign({action}, payload))
-    });
-    if(!res.ok) throw new Error('Sheet save failed: ' + res.status);
-    const json = await res.json().catch(() => null);
-    if(json && json.ok === false){
-      console.error('Save refused by the sheet backend:', json.error);
-      showConnError();
-      return false;
-    }
-    saveCache(); // keep the local cache in sync with our own successful changes
+    await op();
     return true;
   }catch(e){
-    console.error('Failed to save to the sheet', e);
+    console.error('Firestore write failed', e);
     showConnError();
     return false;
   }
 }
+
+async function fbReplaceEntries(removeIds, addEntries){
+  return fbWrite(async () => {
+    const batch = writeBatch(db);
+    removeIds.forEach(id => batch.delete(doc(entriesCol, id)));
+    addEntries.forEach(e => batch.set(doc(entriesCol, e.id), {type: e.type, start: e.start, end: e.end}));
+    await batch.commit();
+  });
+}
+
+async function fbClearEntries(){
+  return fbWrite(async () => {
+    const snap = await getDocs(entriesCol);
+    const ids = snap.docs.map(d => d.id);
+    for(let i=0; i<ids.length; i+=450){
+      const batch = writeBatch(db);
+      ids.slice(i, i+450).forEach(id => batch.delete(doc(entriesCol, id)));
+      await batch.commit();
+    }
+  });
+}
+
+// One-time migration from the old Google Sheet, only runs if Firestore is
+// still empty (i.e. this has never run before) — safe to call every launch.
+async function migrateFromSheetsIfNeeded(){
+  if(entries.length > 0 || weights.length > 0 || Object.keys(notes).length > 0) return;
+  try{
+    const res = await fetch(`${SHEET_API_URL}?t=${Date.now()}`, { cache: 'no-store' });
+    if(!res.ok) return;
+    const json = await res.json();
+    const hasAnything = (json.entries||[]).length || (json.weights||[]).length || Object.keys(json.notes||{}).length;
+    if(!hasAnything) return;
+
+    const batch = writeBatch(db);
+    (json.entries || []).forEach(e => {
+      batch.set(doc(entriesCol, e.id || uid()), {type: e.type, start: e.start, end: (e.end === undefined ? null : e.end)});
+    });
+    Object.keys(json.notes || {}).forEach(date => {
+      batch.set(doc(notesCol, date), {text: json.notes[date]});
+    });
+    (json.weights || []).forEach(w => {
+      batch.set(doc(weightsCol, w.id || uid()), {date: w.date, kg: w.kg});
+    });
+    batch.set(metaDocRef, {weightUnit: json.weightUnit || 'kg'});
+    const hasActiveEntry = (json.entries||[]).some(e => e.type==='sleep' && (e.end===null||e.end===undefined));
+    if(json.sleepStart && !hasActiveEntry){
+      batch.set(doc(entriesCol, uid()), {type:'sleep', start: json.sleepStart, end: null});
+    }
+    await batch.commit();
+    console.log('Migrated existing data from Google Sheets into Firestore.');
+  }catch(e){
+    console.error('Migration from Sheets failed (non-fatal — app still works going forward):', e);
+  }
+}
+
+// ---------- realtime listeners ----------
+// These fire immediately with cached/local data (thanks to offline
+// persistence above), then again any time data changes — including changes
+// made from the other phone. This is what gives real-time sync across
+// devices without needing to refresh.
+let entriesReady = false, notesReady = false, weightsReady = false, metaReady = false;
+let migrationAttempted = false;
+
+function checkAllReady(){
+  if(entriesReady && notesReady && weightsReady && metaReady){
+    if(!dataLoaded){
+      dataLoaded = true;
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('app').style.display = 'flex';
+    }
+    if(!migrationAttempted){
+      migrationAttempted = true;
+      migrateFromSheetsIfNeeded();
+    }
+    render();
+  }
+}
+
+onSnapshot(entriesCol, (snap) => {
+  entries = snap.docs.map(d => ({id: d.id, ...d.data()}));
+  entriesReady = true;
+  checkAllReady();
+}, (err) => { console.error('entries listener error', err); showConnError(); });
+
+onSnapshot(notesCol, (snap) => {
+  const n = {};
+  snap.docs.forEach(d => { n[d.id] = d.data().text; });
+  notes = n;
+  notesReady = true;
+  checkAllReady();
+}, (err) => { console.error('notes listener error', err); showConnError(); });
+
+onSnapshot(weightsCol, (snap) => {
+  weights = snap.docs.map(d => ({id: d.id, ...d.data()}));
+  weightsReady = true;
+  checkAllReady();
+}, (err) => { console.error('weights listener error', err); showConnError(); });
+
+onSnapshot(metaDocRef, (snap) => {
+  weightUnit = (snap.exists() && snap.data().weightUnit) || 'kg';
+  metaReady = true;
+  checkAllReady();
+}, (err) => { console.error('meta listener error', err); showConnError(); });
 
 // ---------- time helpers ----------
 function fmtTime(ms){
@@ -1011,10 +1075,10 @@ function autosizeTextarea(el){
 async function saveNote(key, value){
   if(!value.trim()){
     delete notes[key];
-    await postAction('deleteNote', {date: key});
+    await fbWrite(() => deleteDoc(doc(notesCol, key)));
   } else {
     notes[key] = value;
-    await postAction('setNote', {date: key, text: value});
+    await fbWrite(() => setDoc(doc(notesCol, key), {text: value}));
   }
 }
 
@@ -1625,25 +1689,25 @@ async function saveWeightModal(){
   if(editingWeightId){
     const w = weights.find(x => x.id === editingWeightId);
     if(w){ w.date = dateVal; w.kg = kg; }
-    await postAction('updateWeight', {id: editingWeightId, date: dateVal, kg});
+    await fbWrite(() => updateDoc(doc(weightsCol, editingWeightId), {date: dateVal, kg}));
   } else {
     const w = {id: uid(), date: dateVal, kg};
     weights.push(w);
-    await postAction('addWeight', {weight: w});
+    await fbWrite(() => setDoc(doc(weightsCol, w.id), {date: w.date, kg: w.kg}));
   }
   closeWeightModal();
   renderWeightTab();
 }
 async function deleteWeightModal(){
   weights = weights.filter(x => x.id !== editingWeightId);
-  await postAction('deleteWeight', {id: editingWeightId});
+  await fbWrite(() => deleteDoc(doc(weightsCol, editingWeightId)));
   closeWeightModal();
   renderWeightTab();
 }
 async function setWeightUnit(u){
   if(weightUnit === u) return;
   weightUnit = u;
-  await postAction('setMeta', {key: 'weightUnit', value: u});
+  await fbWrite(() => setDoc(metaDocRef, {weightUnit: u}, {merge: true}));
   renderWeightTab();
 }
 
@@ -1683,7 +1747,7 @@ function flashLogged(text){
 async function logInstant(type){
   const e = {id: uid(), type, start: Date.now(), end: null};
   entries.push(e);
-  await postAction('addEntry', {entry: e});
+  await fbWrite(() => setDoc(doc(entriesCol, e.id), {type: e.type, start: e.start, end: e.end}));
   render();
   flashLogged(LABELS[type] + ' logged at ' + fmtTime(e.start));
 }
@@ -1718,7 +1782,7 @@ async function toggleTimedActivity(type){
     const segments = splitAtMidnight(active.start, Date.now()).map(seg => ({id: uid(), type, start: seg.start, end: seg.end}));
     entries = entries.filter(x => x.id !== active.id);
     segments.forEach(seg => entries.push(seg));
-    await postAction('replaceEntries', {removeIds: [active.id], addEntries: segments});
+    await fbReplaceEntries([active.id], segments);
     render();
     flashLogged(LABELS[type] + ' logged');
   } else {
@@ -1726,7 +1790,7 @@ async function toggleTimedActivity(type){
     // corrected (by tapping it in the list) before it ends.
     const e = {id: uid(), type, start: Date.now(), end: null};
     entries.push(e);
-    await postAction('addEntry', {entry: e});
+    await fbWrite(() => setDoc(doc(entriesCol, e.id), {type: e.type, start: e.start, end: e.end}));
     render();
   }
 }
@@ -1770,23 +1834,23 @@ async function saveEdit(){
       const newEntries = segments.map(seg => ({id: uid(), type: e.type, start: seg.start, end: seg.end}));
       entries = entries.filter(x => x.id !== editingId);
       newEntries.forEach(seg => entries.push(seg));
-      await postAction('replaceEntries', {removeIds: [editingId], addEntries: newEntries});
+      await fbReplaceEntries([editingId], newEntries);
     } else {
       e.start = newStart;
       e.end = newEnd;
-      await postAction('updateEntry', {id: e.id, start: e.start, end: e.end});
+      await fbWrite(() => updateDoc(doc(entriesCol, e.id), {start: e.start, end: e.end}));
     }
   } else {
     // pee/poop/eat, or a still-ongoing sleep/walk — only the start time is editable
     e.start = newStart;
-    await postAction('updateEntry', {id: e.id, start: e.start, end: e.end});
+    await fbWrite(() => updateDoc(doc(entriesCol, e.id), {start: e.start, end: e.end}));
   }
   closeEdit();
   render();
 }
 async function deleteEdit(){
   entries = entries.filter(x=>x.id!==editingId);
-  await postAction('deleteEntry', {id: editingId});
+  await fbWrite(() => deleteDoc(doc(entriesCol, editingId)));
   closeEdit();
   render();
 }
@@ -1798,12 +1862,38 @@ function switchTab(name){
   if(name === 'trends') renderTrends();
 }
 
+// Bypasses Firestore's local cache and asks the server directly — realtime
+// listeners keep things live automatically, but this gives the refresh
+// button and pull-to-refresh gesture a meaningful "confirm I'm truly caught
+// up" action to perform.
+async function forceServerRefresh(){
+  try{
+    const [entriesSnap, notesSnap, weightsSnap, metaSnap] = await Promise.all([
+      getDocsFromServer(entriesCol),
+      getDocsFromServer(notesCol),
+      getDocsFromServer(weightsCol),
+      getDocFromServer(metaDocRef)
+    ]);
+    entries = entriesSnap.docs.map(d => ({id: d.id, ...d.data()}));
+    const n = {};
+    notesSnap.docs.forEach(d => { n[d.id] = d.data().text; });
+    notes = n;
+    weights = weightsSnap.docs.map(d => ({id: d.id, ...d.data()}));
+    weightUnit = (metaSnap.exists() && metaSnap.data().weightUnit) || 'kg';
+    return true;
+  }catch(e){
+    console.error('Force server refresh failed', e);
+    showConnError();
+    return false;
+  }
+}
+
 // ---------- init ----------
 async function refreshData(){
   document.getElementById('connBanner').style.display = 'none';
   document.getElementById('app').style.display = 'none';
   document.getElementById('loading').style.display = 'flex';
-  await loadData();
+  await forceServerRefresh();
   document.getElementById('loading').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   render();
@@ -1859,7 +1949,7 @@ function setupPullToRefresh(){
       icon.style.transform = '';
       label.textContent = 'Refreshing…';
       document.getElementById('connBanner').style.display = 'none';
-      await loadData();
+      await forceServerRefresh();
       render();
       icon.classList.remove('spin');
       icon.style.transform = 'rotate(0deg)';
@@ -1949,7 +2039,7 @@ function wireUpControls(){
   document.getElementById('resetCancel2').onclick = () => document.getElementById('resetOverlay2').classList.remove('show');
   document.getElementById('resetConfirm2').onclick = async () => {
     entries = [];
-    await postAction('clearEntries', {});
+    await fbClearEntries();
     document.getElementById('resetOverlay2').classList.remove('show');
     render();
   };
@@ -1958,7 +2048,7 @@ function wireUpControls(){
   setInterval(() => { renderQuickStats(); if(getActiveTimedEntry('sleep') || getActiveTimedEntry('walk')) renderSleepButton(); }, 15000);
 }
 
-async function init(){
+function init(){
   // iOS Safari won't apply :active/hover states on tap unless a touch listener
   // is registered somewhere in the document — this is what makes button press
   // feedback "just work" on iPhone.
@@ -1966,24 +2056,9 @@ async function init(){
 
   wireUpControls();
   setupPullToRefresh();
-
-  const cached = loadCache();
-  if(cached){
-    // Show cached data immediately — no loading screen, no wait — then quietly
-    // fetch the real latest data in the background and update once it arrives.
-    applyCache(cached);
-    dataLoaded = true;
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('app').style.display = 'flex';
-    render();
-    loadData().then(() => { if(dataLoaded) render(); });
-  } else {
-    // First-ever open on this device — nothing to show yet, so it's a normal load.
-    await loadData();
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('app').style.display = 'flex';
-    render();
-  }
+  // Showing the app itself happens in checkAllReady() above, once the
+  // realtime listeners have delivered their first snapshot (instantly from
+  // Firestore's offline cache if there is one, or from the server otherwise).
 }
 
 init();
