@@ -1134,6 +1134,12 @@ function renderNotesInto(container, key){
 }
 
 function renderHistory(){
+  // Don't tear down and rebuild this section while the user is mid-typing in
+  // the notes box — that would destroy the focused textarea and (on mobile)
+  // dismiss the keyboard, making it look like the note "closed" on its own.
+  const focusedNotes = document.querySelector('.notes-textarea');
+  if(focusedNotes && document.activeElement === focusedNotes) return;
+
   const container = document.getElementById('historyList');
   container.innerHTML = '';
   const todayKey = dateKey(Date.now());
