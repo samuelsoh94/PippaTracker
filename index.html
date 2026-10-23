@@ -155,6 +155,19 @@
     cursor:pointer;
   }
   .entry:active{ background:#FBF6EB; }
+
+  /* Swipe-left-to-delete: the row slides over a delete button that sits behind it */
+  .entry-swipe{ position:relative; }
+  .entry-swipe .entry{ position:relative; z-index:1; touch-action:pan-y; transition:transform .2s ease, background .1s; }
+  .entry-delete-btn{
+    position:absolute; top:0; right:0; bottom:0; width:104px; padding-left:20px;
+    border:none; border-radius:0 14px 14px 0; background:#C5503C; color:#fff;
+    font-family:'Inter',sans-serif; font-weight:600; font-size:13px; cursor:pointer;
+    z-index:0; visibility:hidden;
+  }
+  .entry-delete-btn:active{ filter:brightness(0.9); }
+  .entry-swipe.dragging .entry-delete-btn,
+  .entry-swipe.open .entry-delete-btn{ visibility:visible; }
   .entry .icon-circle{
     width:34px; height:34px; border-radius:50%; flex-shrink:0;
     display:flex; align-items:center; justify-content:center;
@@ -404,6 +417,24 @@
   .loading-screen svg{ width:38px; height:38px; animation: spin 1.2s linear infinite; color:var(--forest); }
   @keyframes spin{ to{ transform:rotate(360deg); } }
 
+  .login-screen{
+    display:flex; align-items:center; justify-content:center; min-height:100vh;
+    padding:20px; background:var(--cream);
+  }
+  .login-card{
+    background:var(--card); border:1px solid var(--line); border-radius:20px;
+    padding:28px 22px; width:100%; max-width:340px; box-shadow:var(--shadow);
+  }
+  .login-card label{ font-size:12px; color:var(--ink-soft); display:block; margin-bottom:5px; }
+  .login-card input{
+    width:100%; padding:11px 12px; border-radius:12px; border:1px solid var(--line);
+    font-family:'Inter',sans-serif; font-size:14px; background:var(--cream); color:var(--ink);
+  }
+  .login-error{
+    margin-top:12px; font-size:12px; color:var(--poop); background:var(--poop-bg);
+    border-radius:10px; padding:8px 10px; line-height:1.4;
+  }
+
   .conn-banner{
     display:none; background:#F6DCC8; color:#7A3E1E; border-bottom:1px solid #E8B48C;
     font-size:12px; text-align:center; padding:9px 16px; line-height:1.4;
@@ -414,6 +445,27 @@
 </head>
 <body>
 
+<div id="loginScreen" class="login-screen" style="display:none">
+  <div class="login-card">
+    <div class="brand" style="justify-content:center; margin-bottom:20px;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#3A5541" stroke-width="1.6">
+        <circle cx="12" cy="15" r="4.2"/>
+        <circle cx="6.2" cy="9.2" r="1.9"/>
+        <circle cx="17.8" cy="9.2" r="1.9"/>
+        <circle cx="9.5" cy="5.3" r="1.7"/>
+        <circle cx="14.5" cy="5.3" r="1.7"/>
+      </svg>
+      <div class="brand-text"><h1>Pippa's Log</h1></div>
+    </div>
+    <label for="loginEmail">Email</label>
+    <input type="email" id="loginEmail" autocomplete="username" placeholder="you@example.com">
+    <label for="loginPassword" style="margin-top:12px;">Password</label>
+    <input type="password" id="loginPassword" autocomplete="current-password" placeholder="••••••••">
+    <div class="login-error" id="loginError" style="display:none"></div>
+    <button class="btn-save" id="loginSubmit" style="margin-top:18px; width:100%; padding:12px;">Sign in</button>
+  </div>
+</div>
+
 <div id="loading" class="loading-screen">
   <svg viewBox="0 0 24 24" fill="none"><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
   <div>Fetching Pippa's data…</div>
@@ -422,7 +474,7 @@
 <div class="app" id="app" style="display:none">
 
   <div class="conn-banner" id="connBanner">
-    Couldn't reach the Google Sheet — your changes aren't saving right now. Check the Apps Script deployment and your connection, then reload.
+    Couldn't reach the database — your changes aren't saving right now. Check your connection, then reload.
   </div>
 
   <header>
@@ -443,12 +495,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 12a9 9 0 0 1 15.3-6.4L21 8M21 3v5h-5"/>
           <path d="M21 12a9 9 0 0 1-15.3 6.4L3 16M3 21v-5h5"/>
-        </svg>
-      </button>
-      <button class="settings-btn" id="settingsBtn" aria-label="Settings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
       </button>
     </div>
@@ -670,35 +716,17 @@
   </div>
 </div>
 
-<div class="overlay" id="resetOverlay">
-  <div class="modal">
-    <h3>Clear all data?</h3>
-    <p style="font-size:13px;color:var(--ink-soft);margin-top:-6px;">This deletes every logged entry for Pippa, for both of you. This can't be undone.</p>
-    <div class="modal-actions" style="margin-top:10px;">
-      <button class="btn-cancel" id="resetCancel">Cancel</button>
-      <button class="btn-delete" id="resetConfirm">Clear everything</button>
-    </div>
-  </div>
-</div>
-
-<div class="overlay" id="resetOverlay2">
-  <div class="modal">
-    <h3>Are you absolutely sure?</h3>
-    <p style="font-size:13px;color:var(--ink-soft);margin-top:-6px;">Last chance — <span id="resetCount"></span> will be permanently deleted for both you and your wife.</p>
-    <div class="modal-actions" style="margin-top:10px;">
-      <button class="btn-cancel" id="resetCancel2">Cancel</button>
-      <button class="btn-delete" id="resetConfirm2">Yes, delete everything</button>
-    </div>
-  </div>
-</div>
-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getFirestore, collection, doc, setDoc, updateDoc, deleteDoc, writeBatch,
-  onSnapshot, getDocs, getDocsFromServer, getDocFromServer,
+  onSnapshot, getDocsFromServer, getDocFromServer,
   enableIndexedDbPersistence
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+  setPersistence, browserLocalPersistence
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDzzOi0WIMFeosD0RAZa_eIfPiXC1SMJwQ",
@@ -714,6 +742,47 @@ enableIndexedDbPersistence(db).catch(() => {
   // Multiple tabs open, or the browser doesn't support it — realtime sync
   // still works fine, just without the offline cache in that specific case.
 });
+
+const auth = getAuth(fbApp);
+setPersistence(auth, browserLocalPersistence).catch(() => {});
+
+// Gate the whole app behind sign-in. Firestore's security rules require an
+// authenticated (allowlisted) user, so nothing above works until this
+// resolves — Firestore listeners are only started once signed in.
+onAuthStateChanged(auth, (user) => {
+  if(user){
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('loginError').style.display = 'none';
+    startListeners();
+  } else {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+  }
+});
+
+function wireLoginForm(){
+  const emailEl = document.getElementById('loginEmail');
+  const passEl = document.getElementById('loginPassword');
+  const errEl = document.getElementById('loginError');
+  const submit = async () => {
+    const email = emailEl.value.trim();
+    const password = passEl.value;
+    if(!email || !password) return;
+    errEl.style.display = 'none';
+    try{
+      await signInWithEmailAndPassword(auth, email, password);
+    }catch(e){
+      errEl.textContent = 'Sign-in failed — check your email and password.';
+      errEl.style.display = 'block';
+    }
+  };
+  document.getElementById('loginSubmit').onclick = submit;
+  [emailEl, passEl].forEach(el => el.addEventListener('keydown', (ev) => {
+    if(ev.key === 'Enter') submit();
+  }));
+}
+wireLoginForm();
 
 const entriesCol = collection(db, 'entries');
 const notesCol = collection(db, 'notes');
@@ -774,18 +843,6 @@ async function fbReplaceEntries(removeIds, addEntries){
   });
 }
 
-async function fbClearEntries(){
-  return fbWrite(async () => {
-    const snap = await getDocs(entriesCol);
-    const ids = snap.docs.map(d => d.id);
-    for(let i=0; i<ids.length; i+=450){
-      const batch = writeBatch(db);
-      ids.slice(i, i+450).forEach(id => batch.delete(doc(entriesCol, id)));
-      await batch.commit();
-    }
-  });
-}
-
 // One-time migration from the old Google Sheet, only runs if Firestore is
 // still empty (i.e. this has never run before) — safe to call every launch.
 async function migrateFromSheetsIfNeeded(){
@@ -823,9 +880,11 @@ async function migrateFromSheetsIfNeeded(){
 // These fire immediately with cached/local data (thanks to offline
 // persistence above), then again any time data changes — including changes
 // made from the other phone. This is what gives real-time sync across
-// devices without needing to refresh.
+// devices without needing to refresh. Only started once signed in, since the
+// security rules now require authentication.
 let entriesReady = false, notesReady = false, weightsReady = false, metaReady = false;
 let migrationAttempted = false;
+let listenersStarted = false;
 
 function checkAllReady(){
   if(entriesReady && notesReady && weightsReady && metaReady){
@@ -842,31 +901,36 @@ function checkAllReady(){
   }
 }
 
-onSnapshot(entriesCol, (snap) => {
-  entries = snap.docs.map(d => ({id: d.id, ...d.data()}));
-  entriesReady = true;
-  checkAllReady();
-}, (err) => { console.error('entries listener error', err); showConnError(); });
+function startListeners(){
+  if(listenersStarted) return;
+  listenersStarted = true;
 
-onSnapshot(notesCol, (snap) => {
-  const n = {};
-  snap.docs.forEach(d => { n[d.id] = d.data().text; });
-  notes = n;
-  notesReady = true;
-  checkAllReady();
-}, (err) => { console.error('notes listener error', err); showConnError(); });
+  onSnapshot(entriesCol, (snap) => {
+    entries = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    entriesReady = true;
+    checkAllReady();
+  }, (err) => { console.error('entries listener error', err); showConnError(); });
 
-onSnapshot(weightsCol, (snap) => {
-  weights = snap.docs.map(d => ({id: d.id, ...d.data()}));
-  weightsReady = true;
-  checkAllReady();
-}, (err) => { console.error('weights listener error', err); showConnError(); });
+  onSnapshot(notesCol, (snap) => {
+    const n = {};
+    snap.docs.forEach(d => { n[d.id] = d.data().text; });
+    notes = n;
+    notesReady = true;
+    checkAllReady();
+  }, (err) => { console.error('notes listener error', err); showConnError(); });
 
-onSnapshot(metaDocRef, (snap) => {
-  weightUnit = (snap.exists() && snap.data().weightUnit) || 'kg';
-  metaReady = true;
-  checkAllReady();
-}, (err) => { console.error('meta listener error', err); showConnError(); });
+  onSnapshot(weightsCol, (snap) => {
+    weights = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    weightsReady = true;
+    checkAllReady();
+  }, (err) => { console.error('weights listener error', err); showConnError(); });
+
+  onSnapshot(metaDocRef, (snap) => {
+    weightUnit = (snap.exists() && snap.data().weightUnit) || 'kg';
+    metaReady = true;
+    checkAllReady();
+  }, (err) => { console.error('meta listener error', err); showConnError(); });
+}
 
 // ---------- time helpers ----------
 function fmtTime(ms){
@@ -932,10 +996,92 @@ function renderQuickStats(){
   }
 }
 
+const SWIPE_REVEAL = 84; // px the row slides to expose the delete button
+let openSwipe = null;    // the one currently-revealed row, so only one is open at a time
+
+function setSwipeOpen(wrap, entryEl, open){
+  entryEl.style.transform = open ? `translateX(-${SWIPE_REVEAL}px)` : 'translateX(0)';
+  wrap.classList.toggle('open', open);
+  if(open){
+    if(openSwipe && openSwipe.wrap !== wrap) setSwipeOpen(openSwipe.wrap, openSwipe.entryEl, false);
+    openSwipe = {wrap, entryEl};
+  } else if(openSwipe && openSwipe.wrap === wrap){
+    openSwipe = null;
+  }
+}
+
+async function deleteEntryById(id){
+  entries = entries.filter(x => x.id !== id);
+  await fbWrite(() => deleteDoc(doc(entriesCol, id)));
+  render();
+}
+
 function entryRow(e){
+  const wrap = document.createElement('div');
+  wrap.className = 'entry-swipe';
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'entry-delete-btn';
+  delBtn.type = 'button';
+  delBtn.textContent = 'Delete';
+  delBtn.addEventListener('click', (ev) => {
+    ev.stopPropagation();
+    deleteEntryById(e.id);
+  });
+  wrap.appendChild(delBtn);
+
   const div = document.createElement('div');
   div.className = 'entry ' + e.type;
-  div.onclick = () => openEdit(e.id);
+
+  // --- swipe-left gesture ---
+  let startX = 0, startY = 0, baseX = 0, currentX = 0;
+  let decided = false, horizontal = false, suppressClickUntil = 0;
+
+  div.addEventListener('touchstart', (ev) => {
+    if(ev.touches.length !== 1) return;
+    startX = ev.touches[0].clientX;
+    startY = ev.touches[0].clientY;
+    baseX = wrap.classList.contains('open') ? -SWIPE_REVEAL : 0;
+    currentX = baseX;
+    decided = false;
+    horizontal = false;
+  }, {passive:true});
+
+  div.addEventListener('touchmove', (ev) => {
+    const dx = ev.touches[0].clientX - startX;
+    const dy = ev.touches[0].clientY - startY;
+    if(!decided){
+      if(Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      decided = true;
+      horizontal = Math.abs(dx) > Math.abs(dy);
+      if(horizontal){
+        div.style.transition = 'none';
+        wrap.classList.add('dragging');
+        if(openSwipe && openSwipe.wrap !== wrap) setSwipeOpen(openSwipe.wrap, openSwipe.entryEl, false);
+      }
+    }
+    if(!horizontal) return; // vertical gesture — let the page scroll normally
+    currentX = Math.max(-SWIPE_REVEAL - 16, Math.min(0, baseX + dx));
+    div.style.transform = `translateX(${currentX}px)`;
+  }, {passive:true});
+
+  const finishSwipe = () => {
+    if(!horizontal){ return; }
+    div.style.transition = ''; // back to the CSS slide animation
+    wrap.classList.remove('dragging');
+    setSwipeOpen(wrap, div, currentX < -SWIPE_REVEAL / 2);
+    suppressClickUntil = Date.now() + 350; // don't treat the end of a swipe as a tap
+    horizontal = false;
+  };
+  div.addEventListener('touchend', finishSwipe, {passive:true});
+  div.addEventListener('touchcancel', finishSwipe, {passive:true});
+
+  div.addEventListener('click', () => {
+    if(Date.now() < suppressClickUntil) return;
+    if(wrap.classList.contains('open')){ setSwipeOpen(wrap, div, false); return; } // tap a revealed row to close it
+    openEdit(e.id);
+  });
+
   let metaText = '';
   if(TIMED_TYPES.includes(e.type)){
     const verb = e.type === 'sleep' ? 'Slept' : 'Walked';
@@ -950,7 +1096,8 @@ function entryRow(e){
     </div>
     <div class="time">${fmtTime(e.start)}</div>
   `;
-  return div;
+  wrap.appendChild(div);
+  return wrap;
 }
 
 let selectedHistoryDate = dateKey(Date.now());
@@ -1911,7 +2058,7 @@ function setupPullToRefresh(){
   const icon = document.getElementById('pullIcon');
   const label = document.getElementById('pullLabel');
   const THRESHOLD = 56;
-  let startY = 0, pulling = false, dragging = false;
+  let startY = 0, startX = 0, pulling = false, dragging = false;
 
   mainEl.addEventListener('touchstart', (ev) => {
     if(ev.touches.length !== 1) return;
@@ -1919,6 +2066,7 @@ function setupPullToRefresh(){
     if(ev.target.closest('input[type=range]') || ev.target.closest('.heatmap-week-wrap')) { pulling = false; return; }
     if(mainEl.scrollTop > 0) { pulling = false; return; }
     startY = ev.touches[0].clientY;
+    startX = ev.touches[0].clientX;
     pulling = true;
     dragging = false;
     indicator.style.transition = 'none';
@@ -1928,6 +2076,9 @@ function setupPullToRefresh(){
     if(!pulling) return;
     if(mainEl.scrollTop > 0){ pulling = false; return; }
     const dy = ev.touches[0].clientY - startY;
+    const dx = ev.touches[0].clientX - startX;
+    // a mostly-sideways gesture (e.g. swiping a row) isn't a pull-to-refresh
+    if(!dragging && Math.abs(dx) > Math.abs(dy)){ pulling = false; return; }
     if(dy <= 0){
       indicator.style.marginTop = -THRESHOLD + 'px';
       icon.style.transform = 'rotate(0deg)';
@@ -2032,24 +2183,6 @@ function wireUpControls(){
   });
 
   document.getElementById('refreshBtn').onclick = refreshData;
-  document.getElementById('settingsBtn').onclick = () => document.getElementById('resetOverlay').classList.add('show');
-  document.getElementById('resetCancel').onclick = () => document.getElementById('resetOverlay').classList.remove('show');
-  document.getElementById('resetConfirm').onclick = () => {
-    document.getElementById('resetOverlay').classList.remove('show');
-    const n = entries.length;
-    document.getElementById('resetCount').textContent = n === 1 ? '1 entry' : (n + ' entries');
-    document.getElementById('resetOverlay2').classList.add('show');
-  };
-  document.getElementById('resetOverlay').onclick = (ev) => { if(ev.target.id==='resetOverlay') document.getElementById('resetOverlay').classList.remove('show'); };
-
-  document.getElementById('resetCancel2').onclick = () => document.getElementById('resetOverlay2').classList.remove('show');
-  document.getElementById('resetConfirm2').onclick = async () => {
-    entries = [];
-    await fbClearEntries();
-    document.getElementById('resetOverlay2').classList.remove('show');
-    render();
-  };
-  document.getElementById('resetOverlay2').onclick = (ev) => { if(ev.target.id==='resetOverlay2') document.getElementById('resetOverlay2').classList.remove('show'); };
 
   setInterval(() => { renderQuickStats(); if(getActiveTimedEntry('sleep') || getActiveTimedEntry('walk')) renderSleepButton(); }, 15000);
 }
@@ -2059,6 +2192,13 @@ function init(){
   // is registered somewhere in the document — this is what makes button press
   // feedback "just work" on iPhone.
   document.addEventListener('touchstart', function(){}, {passive:true});
+
+  // Touching anywhere outside a revealed row closes its delete button.
+  document.addEventListener('touchstart', (ev) => {
+    if(openSwipe && !openSwipe.wrap.contains(ev.target)){
+      setSwipeOpen(openSwipe.wrap, openSwipe.entryEl, false);
+    }
+  }, {passive:true});
 
   wireUpControls();
   setupPullToRefresh();
