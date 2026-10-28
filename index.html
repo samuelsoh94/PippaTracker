@@ -28,6 +28,8 @@
     --walk-bg:#DDEDED;
     --weight:#6B5B95;
     --weight-bg:#E7E3F0;
+    --med:#C45C7A;
+    --med-bg:#F8E3EA;
     --forest:#3A5541;
     --rust:#BC5B2C;
     --shadow: 0 1px 2px rgba(43,38,32,0.06), 0 4px 14px rgba(43,38,32,0.06);
@@ -91,7 +93,7 @@
   .stat .value{ font-family:'JetBrains Mono', monospace; font-size:16px; font-weight:500; margin-top:3px; }
   .dot{ width:7px; height:7px; border-radius:50%; display:inline-block; }
 
-  main{ flex:1; padding: 0 16px 90px; overflow-y:auto; }
+  main{ flex:1; padding: 0 16px calc(100px + env(safe-area-inset-bottom)); overflow-y:auto; }
 
   .pull-indicator{
     height:56px; margin-top:-56px; overflow:hidden;
@@ -363,6 +365,7 @@
     padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
     display:flex; justify-content:center;
     box-shadow: 0 -2px 10px rgba(43,38,32,0.05);
+    z-index:30; /* above the entry rows, below popups (50) */
   }
   .tabbar-inner{ max-width:520px; width:100%; display:flex; }
   .tab{
@@ -416,6 +419,42 @@
   }
   .loading-screen svg{ width:38px; height:38px; animation: spin 1.2s linear infinite; color:var(--forest); }
   @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* ---------- Treatments (Simparica / Droncit) ---------- */
+  .treat-banner{
+    display:flex; align-items:center; gap:10px; background:var(--med-bg); border:1px solid var(--med);
+    border-radius:14px; padding:10px 12px; margin-bottom:10px;
+  }
+  .treat-banner-icon{
+    width:32px; height:32px; border-radius:50%; background:var(--med); color:#fff; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .treat-banner-icon svg{ width:18px; height:18px; fill:currentColor; }
+  .treat-banner-text{ flex:1; min-width:0; font-size:13px; line-height:1.3; }
+  .treat-banner-text .sub{ display:block; font-size:11px; color:var(--ink-soft); margin-top:1px; }
+  .treat-btn{
+    border:none; border-radius:10px; padding:8px 12px; background:var(--med); color:#fff; cursor:pointer;
+    font-family:'Inter',sans-serif; font-weight:600; font-size:12px; white-space:nowrap;
+    transition:transform .1s ease, filter .1s ease;
+  }
+  .treat-btn:active{ transform:scale(0.95); filter:brightness(0.9); }
+  .treat-btn.secondary{ background:var(--line); color:var(--ink); }
+  .treat-row{ display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); }
+  .treat-row:last-child{ border-bottom:none; padding-bottom:0; }
+  .treat-info{ flex:1; min-width:0; }
+  .treat-name{ font-weight:600; font-size:14px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .treat-chip{ font-size:10px; font-weight:600; border-radius:20px; padding:2px 7px; background:var(--line); color:var(--ink-soft); }
+  .treat-chip.due{ background:var(--med); color:#fff; }
+  .treat-meta{ font-size:11px; color:var(--ink-soft); margin-top:3px; font-family:'JetBrains Mono',monospace; line-height:1.5; }
+  .treat-actions{ display:flex; flex-direction:column; gap:6px; }
+  .treat-hint{ font-size:12px; color:var(--ink-soft); margin:-6px 0 0; min-height:16px; }
+  .treat-hist-row{
+    display:flex; align-items:center; justify-content:space-between; padding:6px 6px 6px 10px; margin-bottom:6px;
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    font-family:'JetBrains Mono',monospace; font-size:13px;
+  }
+  .treat-hist-x{ background:none; border:none; color:var(--ink-soft); font-size:18px; line-height:1; cursor:pointer; padding:2px 8px; }
+  .treat-hist-empty{ font-size:12px; color:var(--ink-soft); margin-bottom:6px; }
 
   .login-screen{
     display:flex; align-items:center; justify-content:center; min-height:100vh;
@@ -511,6 +550,7 @@
 
     <!-- LOG TAB -->
     <div class="tab-panel active" id="panel-log">
+      <div id="treatmentBanners"></div>
       <div class="section-title">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3A5541" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
         Today
@@ -612,8 +652,14 @@
       </div>
     </div>
 
-    <!-- WEIGHT TAB -->
+    <!-- HEALTH TAB (treatments + weight) -->
     <div class="tab-panel" id="panel-weight">
+      <div class="trend-card">
+        <h3>Treatments</h3>
+        <div id="treatmentsList"></div>
+      </div>
+
+      <div class="section-title">Weight</div>
       <div class="weight-header-row">
         <div class="unit-toggle" id="unitToggle">
           <button class="unit-btn" data-unit="kg">kg</button>
@@ -679,11 +725,38 @@
         Trends
       </button>
       <button class="tab" data-tab="weight">
-        <span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 15.5c1 .8 2.2 1.2 3.5 1.2s2.5-.4 3.5-1.2M9 9.5c.3-.6.9-1 1.5-1M13.5 9.5c.3-.6.9-1 1.5-1"/></svg></span>
-        Weight
+        <span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6V3z"/></svg></span>
+        Health
       </button>
     </div>
   </nav>
+</div>
+
+<div class="overlay" id="treatGivenOverlay">
+  <div class="modal">
+    <h3 id="treatGivenTitle">Mark as given</h3>
+    <label for="treatGivenDate">Date given</label>
+    <input type="date" id="treatGivenDate">
+    <div class="treat-hint" id="treatGivenHint"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn-cancel" id="treatGivenCancel">Cancel</button>
+      <button class="btn-save" id="treatGivenSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="treatEditOverlay">
+  <div class="modal">
+    <h3 id="treatEditTitle">Edit treatment</h3>
+    <label for="treatEditNext">Next due</label>
+    <input type="date" id="treatEditNext">
+    <label>Doses logged (tap × to remove a mistake)</label>
+    <div id="treatEditHistory"></div>
+    <div class="modal-actions" style="margin-top:12px;">
+      <button class="btn-cancel" id="treatEditCancel">Cancel</button>
+      <button class="btn-save" id="treatEditSave">Save</button>
+    </div>
+  </div>
 </div>
 
 <div class="overlay" id="weightOverlay">
@@ -787,6 +860,7 @@ wireLoginForm();
 const entriesCol = collection(db, 'entries');
 const notesCol = collection(db, 'notes');
 const weightsCol = collection(db, 'weights');
+const treatmentsCol = collection(db, 'treatments');
 const metaDocRef = doc(db, 'meta', 'settings');
 
 // Old Google Sheets API — kept only as a one-time migration source, not used
@@ -796,6 +870,15 @@ const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbymTAseFKjyBi-ZLO
 let entries = [];      // {id, type: 'pee'|'poop'|'sleep', start: ms, end: ms|null}
 let notes = {};        // { 'YYYY-MM-DD': 'note text' }
 let weights = [];      // {id, date: 'YYYY-MM-DD', kg: number}
+// Treatments: {id, name, intervalMonths, nextDue: 'YYYY-MM-DD', given: [{date, prev}]}
+// "Rolling" schedule — after a dose, next due = the date it was actually given + interval.
+let treatments = [];
+// Starting schedule, created once if it doesn't exist yet. Simparica was last given
+// 23 Oct (so next due 23 Nov); Droncit is next due 26 Oct.
+const TREATMENT_SEEDS = [
+  {id:'simparica', name:'Simparica', intervalMonths:1, nextDue:'2026-11-23', given:[{date:'2026-10-23', prev:'2026-10-23'}]},
+  {id:'droncit',   name:'Droncit',   intervalMonths:3, nextDue:'2026-10-26', given:[]}
+];
 let weightUnit = 'kg';
 let weightRangeFrom = 0;
 let weightRangeTo = null;
@@ -896,6 +979,7 @@ function checkAllReady(){
     if(!migrationAttempted){
       migrationAttempted = true;
       migrateFromSheetsIfNeeded();
+      seedTreatmentsIfNeeded();
     }
     render();
   }
@@ -930,6 +1014,28 @@ function startListeners(){
     metaReady = true;
     checkAllReady();
   }, (err) => { console.error('meta listener error', err); showConnError(); });
+
+  // Treatments update live on both phones, but don't hold up the app starting.
+  onSnapshot(treatmentsCol, (snap) => {
+    treatments = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    renderTreatments();
+  }, (err) => { console.error('treatments listener error', err); showConnError(); });
+}
+
+// Creates the Simparica/Droncit schedule the first time only. Checks the server
+// (not the local cache) so an empty cache can never overwrite real data.
+async function seedTreatmentsIfNeeded(){
+  try{
+    for(const t of TREATMENT_SEEDS){
+      const ref = doc(treatmentsCol, t.id);
+      const snap = await getDocFromServer(ref);
+      if(!snap.exists()){
+        await setDoc(ref, {name: t.name, intervalMonths: t.intervalMonths, nextDue: t.nextDue, given: t.given});
+      }
+    }
+  }catch(e){
+    console.error('Treatment setup skipped (will retry next launch)', e);
+  }
 }
 
 // ---------- time helpers ----------
@@ -962,7 +1068,7 @@ function fmtDuration(ms){
   return h + 'h ' + m + 'm';
 }
 function toLocalInputValue(ms){
-  const d = new Date(ms - new Date().getTimezoneOffset()*60000);
+  const d = new Date(ms - new Date(ms).getTimezoneOffset()*60000);
   return d.toISOString().slice(0,16);
 }
 function fromLocalInputValue(str){
@@ -975,7 +1081,229 @@ function render(){
   renderHistory();
   renderTrends();
   renderWeightTab();
+  renderTreatments();
   renderSleepButton();
+}
+
+// ---------- Treatments (Simparica / Droncit) ----------
+const CROSS_SVG = '<svg viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6V3z"/></svg>';
+let treatGivenId = null, treatEditId = null;
+
+// 'YYYY-MM-DD' + n months, clamping to the end of shorter months (e.g. 31 Jan + 1 month = 28/29 Feb)
+function addMonthsKey(key, n){
+  const [y, m, d] = key.split('-').map(Number);
+  const total = (m - 1) + n;
+  const ty = y + Math.floor(total / 12);
+  const tm = ((total % 12) + 12) % 12;
+  const day = Math.min(d, new Date(ty, tm + 1, 0).getDate());
+  return `${ty}-${String(tm + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+function daysBetween(aKey, bKey){
+  return Math.round((new Date(bKey + 'T12:00:00') - new Date(aKey + 'T12:00:00')) / 86400000);
+}
+function fmtShortDate(key){
+  const opts = {day: 'numeric', month: 'short'};
+  if(Number(key.slice(0, 4)) !== new Date().getFullYear()) opts.year = 'numeric';
+  return new Date(key + 'T12:00:00').toLocaleDateString([], opts);
+}
+function latestGiven(t){
+  return (t.given || []).reduce((a, g) => g.date > a ? g.date : a, '') || null;
+}
+
+function renderTreatments(){
+  const today = dateKey(Date.now());
+  const sorted = treatments.filter(t => t.nextDue).sort((a, b) => a.nextDue.localeCompare(b.nextDue));
+
+  // Banners on the Log page — from the due day onward, until it's marked as given
+  const bannerEl = document.getElementById('treatmentBanners');
+  bannerEl.innerHTML = '';
+  sorted.filter(t => t.nextDue <= today).forEach(t => {
+    const late = daysBetween(t.nextDue, today);
+    const when = late === 0 ? 'is due today' : (late === 1 ? 'was due yesterday' : `was due ${late} days ago`);
+    const box = document.createElement('div');
+    box.className = 'treat-banner';
+    const icon = document.createElement('div');
+    icon.className = 'treat-banner-icon';
+    icon.innerHTML = CROSS_SVG;
+    const text = document.createElement('div');
+    text.className = 'treat-banner-text';
+    const strong = document.createElement('strong');
+    strong.textContent = t.name;
+    const sub = document.createElement('span');
+    sub.className = 'sub';
+    sub.textContent = 'Due ' + fmtShortDate(t.nextDue);
+    text.append(strong, ' ' + when, sub);
+    const btn = document.createElement('button');
+    btn.className = 'treat-btn';
+    btn.type = 'button';
+    btn.textContent = 'Mark given';
+    btn.onclick = () => openTreatGiven(t.id);
+    box.append(icon, text, btn);
+    bannerEl.appendChild(box);
+  });
+
+  // Card on the Health page
+  const list = document.getElementById('treatmentsList');
+  list.innerHTML = '';
+  if(!sorted.length){
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.textContent = 'Setting up treatments…';
+    list.appendChild(empty);
+    return;
+  }
+  sorted.forEach(t => {
+    const diff = daysBetween(today, t.nextDue); // negative = overdue
+    const chipText = diff < 0 ? `Overdue ${-diff}d` : diff === 0 ? 'Due today' : diff === 1 ? 'Tomorrow' : `In ${diff} days`;
+    const last = latestGiven(t);
+    const row = document.createElement('div');
+    row.className = 'treat-row';
+
+    const info = document.createElement('div');
+    info.className = 'treat-info';
+    const name = document.createElement('div');
+    name.className = 'treat-name';
+    name.append(t.name);
+    const chip = document.createElement('span');
+    chip.className = 'treat-chip' + (diff <= 0 ? ' due' : '');
+    chip.textContent = chipText;
+    name.appendChild(chip);
+    const meta = document.createElement('div');
+    meta.className = 'treat-meta';
+    const every = t.intervalMonths === 1 ? 'Every month' : `Every ${t.intervalMonths} months`;
+    meta.innerHTML = '';
+    meta.append(`${every} · last given ${last ? fmtShortDate(last) : '—'}`, document.createElement('br'), `Next due ${fmtShortDate(t.nextDue)}`);
+    info.append(name, meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'treat-actions';
+    const give = document.createElement('button');
+    give.className = 'treat-btn';
+    give.type = 'button';
+    give.textContent = 'Mark given';
+    give.onclick = () => openTreatGiven(t.id);
+    const edit = document.createElement('button');
+    edit.className = 'treat-btn secondary';
+    edit.type = 'button';
+    edit.textContent = 'Edit';
+    edit.onclick = () => openTreatEdit(t.id);
+    actions.append(give, edit);
+
+    row.append(info, actions);
+    list.appendChild(row);
+  });
+}
+
+// --- mark as given ---
+function openTreatGiven(id){
+  const t = treatments.find(x => x.id === id);
+  if(!t) return;
+  treatGivenId = id;
+  document.getElementById('treatGivenTitle').textContent = `Mark ${t.name} as given`;
+  document.getElementById('treatGivenDate').value = dateKey(Date.now());
+  updateTreatGivenHint();
+  document.getElementById('treatGivenOverlay').classList.add('show');
+}
+function updateTreatGivenHint(){
+  const t = treatments.find(x => x.id === treatGivenId);
+  const v = document.getElementById('treatGivenDate').value;
+  const hint = document.getElementById('treatGivenHint');
+  if(!t || !v){ hint.textContent = ''; return; }
+  const latest = [latestGiven(t), v].filter(Boolean).sort().pop();
+  hint.textContent = `Next dose will be due ${fmtShortDate(addMonthsKey(latest, t.intervalMonths))}`;
+}
+function closeTreatGiven(){
+  document.getElementById('treatGivenOverlay').classList.remove('show');
+  treatGivenId = null;
+}
+async function markTreatmentGiven(id, dateStr){
+  const t = treatments.find(x => x.id === id);
+  if(!t) return;
+  if((t.given || []).some(g => g.date === dateStr)) return; // already recorded (e.g. the other phone got there first)
+  const given = [...(t.given || []), {date: dateStr, prev: t.nextDue}];
+  const latest = given.reduce((a, g) => g.date > a ? g.date : a, '');
+  const nextDue = addMonthsKey(latest, t.intervalMonths);
+  t.given = given;
+  t.nextDue = nextDue;
+  renderTreatments();
+  await fbWrite(() => updateDoc(doc(treatmentsCol, id), {given, nextDue}));
+}
+async function saveTreatGiven(){
+  const v = document.getElementById('treatGivenDate').value;
+  const id = treatGivenId;
+  if(!v || !id) return;
+  closeTreatGiven();
+  await markTreatmentGiven(id, v);
+}
+
+// --- edit next due / remove a mistaken dose ---
+function openTreatEdit(id){
+  const t = treatments.find(x => x.id === id);
+  if(!t) return;
+  treatEditId = id;
+  document.getElementById('treatEditTitle').textContent = `Edit ${t.name}`;
+  document.getElementById('treatEditNext').value = t.nextDue || '';
+  renderTreatEditHistory();
+  document.getElementById('treatEditOverlay').classList.add('show');
+}
+function closeTreatEdit(){
+  document.getElementById('treatEditOverlay').classList.remove('show');
+  treatEditId = null;
+}
+function renderTreatEditHistory(){
+  const t = treatments.find(x => x.id === treatEditId);
+  const wrap = document.getElementById('treatEditHistory');
+  wrap.innerHTML = '';
+  if(!t) return;
+  const items = [...(t.given || [])].sort((a, b) => b.date.localeCompare(a.date));
+  if(!items.length){
+    const none = document.createElement('div');
+    none.className = 'treat-hist-empty';
+    none.textContent = 'No doses logged yet';
+    wrap.appendChild(none);
+    return;
+  }
+  items.forEach(g => {
+    const row = document.createElement('div');
+    row.className = 'treat-hist-row';
+    const label = document.createElement('span');
+    label.textContent = fmtShortDate(g.date);
+    const x = document.createElement('button');
+    x.className = 'treat-hist-x';
+    x.type = 'button';
+    x.setAttribute('aria-label', 'Remove this dose');
+    x.textContent = '×';
+    x.onclick = () => removeTreatmentDose(t.id, g.date);
+    row.append(label, x);
+    wrap.appendChild(row);
+  });
+}
+async function removeTreatmentDose(id, date){
+  const t = treatments.find(x => x.id === id);
+  if(!t) return;
+  const removed = (t.given || []).find(g => g.date === date);
+  if(!removed) return;
+  const wasLatest = date === latestGiven(t);
+  const given = t.given.filter(g => g.date !== date);
+  // Removing the most recent dose rolls the schedule back to what it was before it
+  const nextDue = wasLatest && removed.prev ? removed.prev : t.nextDue;
+  t.given = given;
+  t.nextDue = nextDue;
+  document.getElementById('treatEditNext').value = nextDue;
+  renderTreatEditHistory();
+  renderTreatments();
+  await fbWrite(() => updateDoc(doc(treatmentsCol, id), {given, nextDue}));
+}
+async function saveTreatEdit(){
+  const v = document.getElementById('treatEditNext').value;
+  const id = treatEditId;
+  if(!v || !id) return;
+  const t = treatments.find(x => x.id === id);
+  closeTreatEdit();
+  if(!t || t.nextDue === v) return;
+  t.nextDue = v;
+  renderTreatments();
+  await fbWrite(() => updateDoc(doc(treatmentsCol, id), {nextDue: v}));
 }
 
 function renderQuickStats(){
@@ -1106,22 +1434,30 @@ const HM_RGB = { eat:'110,140,78', pee:'91,155,213', poop:'217,178,60', sleep:'1
 const HM_ROWS = [ ['eat','Eat'], ['pee','Pee'], ['poop','Poop'], ['sleep','Sleep'], ['walk','Walk'] ];
 const TIMED_TYPES = ['sleep', 'walk']; // activities with a start AND end, tracked by duration rather than count
 
+// A day runs from one local midnight to the next. That's 24 hours normally,
+// but 23 or 25 hours on the days the clocks change.
 function getDayBounds(key){
-  const start = new Date(key+'T00:00:00').getTime();
-  return [start, start + 86400000];
+  const [y, m, d] = key.split('-').map(Number);
+  return [new Date(y, m - 1, d).getTime(), new Date(y, m - 1, d + 1).getTime()];
 }
 
+// Adds the time between start and end into wall-clock buckets (hour-of-day or
+// quarter-hour-of-day), so a bucket always means "what the clock on the wall
+// said" — even on a day the clocks change. When the clocks go back, the repeated
+// hour is counted in the same row, which is why that day allows up to double.
 function accumulateSleepHours(start, end, dayStart, dayEnd, arr, bucketMs){
   bucketMs = bucketMs || 3600000;
-  const cap = bucketMs / 3600000;
-  const s = Math.max(start, dayStart);
-  const en = Math.min(end == null ? Date.now() : end, dayEnd);
-  if(en <= s) return;
-  for(let i=0; i<arr.length; i++){
-    const bStart = dayStart + i*bucketMs;
-    const bEnd = bStart + bucketMs;
-    const overlap = Math.min(en, bEnd) - Math.max(s, bStart);
-    if(overlap > 0) arr[i] = Math.min(cap, arr[i] + overlap/3600000);
+  const capFactor = (dayEnd - dayStart) > 24.5 * 3600000 ? 2 : 1;
+  const cap = capFactor * bucketMs / 3600000;
+  let t = Math.max(start, dayStart);
+  const stop = Math.min(end == null ? Date.now() : end, dayEnd);
+  while(t < stop){
+    const d = new Date(t);
+    const localMs = ((d.getHours() * 60 + d.getMinutes()) * 60 + d.getSeconds()) * 1000 + d.getMilliseconds();
+    const idx = Math.floor(localMs / bucketMs);
+    const chunkEnd = Math.min(stop, t + ((idx + 1) * bucketMs - localMs)); // up to the next bucket boundary
+    if(idx >= 0 && idx < arr.length) arr[idx] = Math.min(cap, arr[idx] + (chunkEnd - t) / 3600000);
+    t = chunkEnd;
   }
 }
 
@@ -1526,7 +1862,7 @@ function renderTrends(){
     cursor.setHours(0,0,0,0);
     while(cursor.getTime() < endMs){
       const nightStart = cursor.getTime();
-      const nightEnd = nightStart + 5*3600000; // 00:00–05:00
+      const nightEnd = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), 5).getTime(); // 00:00–05:00 on the wall clock
       const overlapStart = Math.max(startMs, nightStart);
       const overlapEnd = Math.min(endMs, nightEnd);
       if(overlapEnd > overlapStart) total += (overlapEnd - overlapStart);
@@ -1911,8 +2247,15 @@ async function logInstant(type){
 function splitAtMidnight(start, end){
   const segments = [];
   let segStart = start;
+  let guard = 0;
   while(true){
     const nextMidnight = getDayBounds(dateKey(segStart))[1];
+    // Safety stop: a day boundary that doesn't move us forward (or an absurdly long
+    // span) must never be able to loop forever and freeze the app.
+    if(nextMidnight <= segStart || ++guard > 400){
+      segments.push({start: segStart, end: end});
+      break;
+    }
     if(end <= nextMidnight){
       segments.push({start: segStart, end: end});
       break;
@@ -2184,7 +2527,19 @@ function wireUpControls(){
 
   document.getElementById('refreshBtn').onclick = refreshData;
 
-  setInterval(() => { renderQuickStats(); if(getActiveTimedEntry('sleep') || getActiveTimedEntry('walk')) renderSleepButton(); }, 15000);
+  document.getElementById('treatGivenCancel').onclick = closeTreatGiven;
+  document.getElementById('treatGivenSave').onclick = saveTreatGiven;
+  document.getElementById('treatGivenDate').addEventListener('input', updateTreatGivenHint);
+  document.getElementById('treatGivenOverlay').onclick = (ev) => { if(ev.target.id === 'treatGivenOverlay') closeTreatGiven(); };
+  document.getElementById('treatEditCancel').onclick = closeTreatEdit;
+  document.getElementById('treatEditSave').onclick = saveTreatEdit;
+  document.getElementById('treatEditOverlay').onclick = (ev) => { if(ev.target.id === 'treatEditOverlay') closeTreatEdit(); };
+
+  setInterval(() => {
+    renderQuickStats();
+    renderTreatments(); // so a banner appears if the app is left open as the day rolls over
+    if(getActiveTimedEntry('sleep') || getActiveTimedEntry('walk')) renderSleepButton();
+  }, 15000);
 }
 
 function init(){
